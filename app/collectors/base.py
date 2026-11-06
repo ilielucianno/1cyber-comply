@@ -1,15 +1,18 @@
 """Interfata comuna pentru toti colectorii (Wazuh, OPNsense, ...).
 
 Fiecare colector nou mosteneste BaseCollector si implementeaza collect().
-Asa adaugam surse noi fara sa modificam restul aplicatiei.
+Un colector produce rezultate per verificare ("check"). Runner-ul le leaga de
+controalele care au in YAML `automation: <name>:<check>`.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 
+PASS, FAIL, UNKNOWN = "pass", "fail", "unknown"
+
 
 @dataclass
-class EvidenceItem:
-    control_id: str
+class CheckResult:
+    check: str             # ex: agents_active (fara prefixul sursei)
     status: str            # pass | fail | unknown
     summary: str
     raw: dict = field(default_factory=dict)
@@ -27,5 +30,6 @@ class BaseCollector(ABC):
         """Verifica legatura cu sursa. Returneaza (ok, mesaj)."""
 
     @abstractmethod
-    def collect(self) -> list[EvidenceItem]:
-        """Colecteaza dovezile si le mapeaza pe controale."""
+    def collect(self) -> list[CheckResult]:
+        """Ruleaza toate verificarile. O verificare care esueaza devine 'unknown',
+        nu opreste celelalte verificari."""

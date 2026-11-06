@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.2.0) — stage 1, NIS2 control catalogue.
+**Status:** early development (v0.3.0) — stage 2a, Wazuh collector.
 
 ## Why
 
@@ -17,10 +17,12 @@ for free, using tools many teams already run.
 |---|---|---|
 | 0 | Project foundation, database, web UI, Docker | done |
 | 1 | NIS2 Art. 21 control catalogue (41 controls) | done |
-| 2 | Collectors: Wazuh API, OPNsense API | next |
+| 2a | Wazuh collector (Server API + Indexer): 7 automated checks | done |
+| 2b | OPNsense collector: 7 automated checks | next |
 | 3 | Evidence-to-control mapping, compliance score | planned |
 | 4 | PDF reports, manual evidence upload | planned |
-| 5 | One-line installer, .deb package | planned |
+| 5 | Login, user accounts, HTTPS — required before exposing the app on a network | planned |
+| 6 | One-line installer, .deb package | planned |
 
 ## Quick start (Docker)
 
@@ -40,6 +42,21 @@ pip install -r requirements.txt pytest
 pytest -q
 uvicorn app.main:app --reload --port 8080
 ```
+
+## Connecting Wazuh
+
+Create a dedicated read-only API user (role `readonly`) and set in `.env`:
+
+```
+WAZUH_URL=https://host.docker.internal:55000
+WAZUH_USER=comply
+WAZUH_PASSWORD=...
+```
+
+Alerts and vulnerabilities live in the Wazuh Indexer (Wazuh 4.8+). Optionally add a
+read-only indexer user with `WAZUH_INDEXER_URL`, `WAZUH_INDEXER_USER`, `WAZUH_INDEXER_PASSWORD`.
+
+> Security note: until stage 5 the web UI has no login. Keep it bound to 127.0.0.1 (default).
 
 ## Architecture
 

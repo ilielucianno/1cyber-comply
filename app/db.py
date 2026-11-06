@@ -37,6 +37,15 @@ CREATE TABLE IF NOT EXISTS evidence (
 );
 
 CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence(control_id);
+
+CREATE TABLE IF NOT EXISTS collection_runs (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    source      TEXT NOT NULL,             -- wazuh | opnsense
+    started_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    finished_at TEXT,
+    ok          INTEGER NOT NULL DEFAULT 0,
+    message     TEXT
+);
 """
 
 

@@ -9,6 +9,10 @@ services:
       - "127.0.0.1:8080:8080"   # doar local; pune un reverse proxy in fata pentru acces din retea
     volumes:
       - comply-data:/data
+    extra_hosts:
+      # Permite containerului sa ajunga la serviciile de pe masina gazda (ex: Wazuh)
+      # prin numele host.docker.internal, indiferent de IP-ul primit prin DHCP.
+      - "host.docker.internal:host-gateway"
 
 volumes:
   comply-data:

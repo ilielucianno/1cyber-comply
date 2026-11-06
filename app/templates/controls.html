@@ -2,16 +2,26 @@
 {% block title %}Controale {{ framework.name }} · {{ app_name }}{% endblock %}
 {% block content %}
 <p class="muted" style="margin-top:0">{{ framework.name }} {{ framework.version }} — {{ framework.description }}</p>
+<p>
+  <span class="st pass">{{ counts.pass }} pass</span>
+  <span class="st fail">{{ counts.fail }} fail</span>
+  <span class="st unknown">{{ counts.unknown }} unknown</span>
+</p>
 
 {% for cat in categories %}
 <h2>{{ cat.reference }} · {{ cat.title }}</h2>
 <div class="card">
   {% for c in cat.controls %}
+  {% set e = latest.get(c.id) %}
   <div class="row">
     <div>
       <div><strong>{{ c.title }}</strong> <code>{{ c.id }}</code></div>
       <div class="muted" style="font-size:14px">{{ c.description }}</div>
       {% if c.evidence_hint %}<div style="font-size:13px;margin-top:4px">Dovada: <span class="muted">{{ c.evidence_hint }}</span></div>{% endif %}
+      {% if e %}
+      <div class="evidence"><span class="st {{ e.status }}">{{ e.status }}</span> {{ e.summary }}
+        <span class="muted">· {{ e.source }} · {{ e.collected_at }} UTC</span></div>
+      {% endif %}
     </div>
     <div style="text-align:right">
       <span class="tag {{ c.check_type }}">{{ 'automat' if c.check_type == 'automated' else 'manual' }}</span>
