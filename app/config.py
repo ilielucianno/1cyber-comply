@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_NAME = "1cyber Comply"
-APP_VERSION = "0.3.2"
+APP_VERSION = "0.4.0"
 
 # SQLite database (a single file, no separate server)
 DATA_DIR = Path(os.getenv("COMPLY_DATA_DIR", BASE_DIR / "data"))
@@ -35,3 +35,7 @@ OPNSENSE_URL = os.getenv("OPNSENSE_URL", "")
 OPNSENSE_KEY = os.getenv("OPNSENSE_KEY", "")
 OPNSENSE_SECRET = os.getenv("OPNSENSE_SECRET", "")
 OPNSENSE_VERIFY_TLS = os.getenv("OPNSENSE_VERIFY_TLS", "false").lower() == "true"
+
+# Compare the installed OPNsense version with the latest public release on GitHub.
+# Set to false on networks without internet access (the check then reports 'unknown').
+OPNSENSE_CHECK_LATEST = os.getenv("OPNSENSE_CHECK_LATEST", "true").lower() == "true"

@@ -90,9 +90,11 @@ categories:
       - id: nis2-c-02
         title: Firewall configuration backed up
         description: The perimeter firewall configuration is backed up automatically and recent backups exist.
-        check_type: automated
-        automation: opnsense:config_backup
-        evidence_hint: Backup schedule and date of the most recent configuration backup.
+        check_type: manual
+        evidence_hint: >-
+          Screenshot of the automatic backup settings (e.g. Nextcloud, Google Drive or git) and the date
+          of the most recent backup. Kept manual on purpose - reading backups via API needs privileges
+          that also allow downloading or restoring the full configuration.
       - id: nis2-c-03
         title: Data backups performed and tested
         description: Critical data is backed up on a schedule, kept separately from production and restore tests are performed.
@@ -277,9 +279,10 @@ categories:
       - id: nis2-j-02
         title: MFA on firewall administration
         description: Administrator login to the firewall requires a second factor.
-        check_type: automated
-        automation: opnsense:mfa
-        evidence_hint: Authentication server configuration showing TOTP for admin users.
+        check_type: manual
+        evidence_hint: >-
+          Screenshot of the TOTP authentication server and the web GUI authentication setting.
+          Kept manual on purpose - reading it via API needs user-management privileges.
       - id: nis2-j-03
         title: Secured internal communications
         description: Voice, video and text communications used for business run on encrypted platforms.

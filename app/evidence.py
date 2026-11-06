@@ -9,8 +9,9 @@ log = logging.getLogger("comply.evidence")
 
 
 def get_collectors() -> dict[str, BaseCollector]:
+    from app.collectors.opnsense import OPNsenseCollector
     from app.collectors.wazuh import WazuhCollector
-    return {"wazuh": WazuhCollector()}
+    return {"wazuh": WazuhCollector(), "opnsense": OPNsenseCollector()}
 
 
 def save_results(source: str, results: list[CheckResult]) -> int:

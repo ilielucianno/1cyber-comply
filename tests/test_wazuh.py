@@ -189,4 +189,4 @@ def test_ui_buttons_redirect_with_message(wazuh_env, monkeypatch):
         assert r.status_code == 303 and "ok=1" in r.headers["location"]
         r = client.post("/sources/wazuh/collect")
         assert r.status_code == 200 and "checks:" in r.text
-        assert client.post("/api/sources/opnsense/collect").status_code == 404
+        assert client.post("/api/sources/unknown/collect").status_code == 404
