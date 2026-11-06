@@ -8,7 +8,8 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, evidence
+from app import catalog, config, evidence, scoring
+from app.scheduler import run_all, scheduler
 from app.db import get_conn, init_db
 
 logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(message)s")
@@ -19,7 +20,9 @@ templates = Jinja2Templates(directory=str(config.BASE_DIR / "app" / "templates")
 async def lifespan(_app: FastAPI):
     init_db()            # create / migrate tables
     catalog.load_all()   # load controls from controls/*.yaml
+    scheduler.start()    # automatic collection (if COLLECT_INTERVAL_HOURS > 0)
     yield
+    scheduler.stop()
 
 
 app = FastAPI(title=config.APP_NAME, version=config.APP_VERSION, lifespan=lifespan)
@@ -100,6 +103,24 @@ def api_controls(framework_id: str):
     return {"framework": fw, "status_counts": evidence.status_counts(framework_id), "categories": cats}
 
 
+@app.get("/api/frameworks/{framework_id}/score")
+def api_score(framework_id: str):
+    _framework(framework_id)
+    return {**scoring.compute(framework_id), "history": scoring.history(framework_id)}
+
+
+@app.get("/api/schedule")
+def api_schedule():
+    fmt = lambda d: d.strftime("%Y-%m-%d %H:%M UTC") if d else None  # noqa: E731
+    return {"enabled": scheduler.enabled, "interval_hours": config.COLLECT_INTERVAL_HOURS,
+            "next_run": fmt(scheduler.next_run), "last_run": fmt(scheduler.last_run)}
+
+
+@app.post("/api/collect-all")
+def api_collect_all():
+    return run_all()
+
+
 @app.post("/api/sources/{source}/test")
 def api_test_source(source: str):
     ok, message = _collector(source).test_connection()
@@ -126,6 +147,14 @@ def ui_collect(source: str):
                             status_code=303)
 
 
+@app.post("/collect-all")
+def ui_collect_all():
+    results = run_all()
+    ok = all(r["ok"] for r in results.values()) if results else False
+    msg = "; ".join(f"{k}: {v['message']}" for k, v in results.items() if k != "comply") or "No sources configured"
+    return RedirectResponse(f"/?ok={int(ok)}&msg={quote(msg)}", status_code=303)
+
+
 # ---------- UI ----------
 
 @app.get("/", response_class=HTMLResponse)
@@ -133,11 +162,13 @@ def index(request: Request, msg: str | None = None, ok: int = 1):
     frameworks = _frameworks()
     for fw in frameworks:
         fw["status_counts"] = evidence.status_counts(fw["id"])
+        fw["score"] = scoring.compute(fw["id"])
+        fw["chart"] = scoring.chart_svg(scoring.history(fw["id"]))
     return templates.TemplateResponse(request, "index.html", {
         "app_name": config.APP_NAME, "version": config.APP_VERSION, "page": "home",
         "stats": _stats(), "sources": _sources(), "frameworks": frameworks,
         "collectors": evidence.get_collectors(), "runs": evidence.last_runs(),
-        "flash": msg, "flash_ok": bool(ok),
+        "schedule": api_schedule(), "flash": msg, "flash_ok": bool(ok),
     })
 
 

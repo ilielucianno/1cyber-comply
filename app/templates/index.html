@@ -2,6 +2,28 @@
 {% block content %}
 {% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
 
+{% for fw in frameworks %}
+<div class="card" style="margin-bottom:24px">
+  <div class="score">
+    <div>
+      <div class="sub">{{ fw.name }} compliance score</div>
+      <div class="big">{{ fw.score.score|round|int }}%</div>
+      <div class="bar"><span style="width:{{ fw.score.score }}%"></span></div>
+    </div>
+    <div class="sub">
+      <div>{{ fw.score.passed }} of {{ fw.score.total }} controls proven (pass)</div>
+      <div>Automated controls: {{ fw.score.automated_score|round|int }}% ({{ fw.score.automated_total }} controls)</div>
+      <div>Manual controls: {{ fw.score.manual_score|round|int }}% ({{ fw.score.manual_total }} controls, evidence upload in stage 4)</div>
+      <div>{{ fw.score.failed }} fail · {{ fw.score.unknown }} unknown · {{ fw.score.missing }} without evidence</div>
+    </div>
+  </div>
+  {% if fw.chart %}
+  <div style="margin-top:16px">{{ fw.chart|safe }}</div>
+  <div class="legend"><i style="background:var(--accent)"></i>overall score<i style="background:var(--ok)"></i>automated controls</div>
+  {% endif %}
+</div>
+{% endfor %}
+
 <div class="grid">
   <div class="card"><div class="num">{{ stats.frameworks }}</div><div class="lbl">Frameworks</div></div>
   <div class="card"><div class="num">{{ stats.controls }}</div><div class="lbl">Controls</div></div>
@@ -28,6 +50,20 @@
 </div>
 
 <h2>Data sources</h2>
+<div class="card" style="margin-bottom:12px">
+  <div class="row">
+    <div>
+      {% if schedule.enabled %}
+      Automatic collection every {{ schedule.interval_hours|round(1) }}h
+      <div class="muted" style="font-size:13px">Next run: {{ schedule.next_run or '-' }}{% if schedule.last_run %} · last: {{ schedule.last_run }}{% endif %}</div>
+      {% else %}
+      <span class="off">Automatic collection disabled</span>
+      <div class="muted" style="font-size:13px">Set COLLECT_INTERVAL_HOURS in .env to enable it.</div>
+      {% endif %}
+    </div>
+    <form method="post" action="/collect-all"><button>Collect all now</button></form>
+  </div>
+</div>
 <div class="card">
   {% for name, ok in sources.items() %}
   <div class="row">

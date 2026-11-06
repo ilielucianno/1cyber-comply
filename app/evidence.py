@@ -9,9 +9,10 @@ log = logging.getLogger("comply.evidence")
 
 
 def get_collectors() -> dict[str, BaseCollector]:
+    from app.collectors.comply import ComplyCollector
     from app.collectors.opnsense import OPNsenseCollector
     from app.collectors.wazuh import WazuhCollector
-    return {"wazuh": WazuhCollector(), "opnsense": OPNsenseCollector()}
+    return {"wazuh": WazuhCollector(), "opnsense": OPNsenseCollector(), "comply": ComplyCollector()}
 
 
 def save_results(source: str, results: list[CheckResult]) -> int:
@@ -32,7 +33,7 @@ def save_results(source: str, results: list[CheckResult]) -> int:
     return saved
 
 
-def run_collection(source: str, collector: BaseCollector | None = None) -> dict:
+def run_collection(source: str, collector: BaseCollector | None = None, snapshot: bool = True) -> dict:
     collector = collector or get_collectors()[source]
     if not collector.is_configured():
         return {"ok": False, "message": f"{source} is not configured in .env", "saved": 0}
@@ -54,6 +55,9 @@ def run_collection(source: str, collector: BaseCollector | None = None) -> dict:
     with get_conn() as conn:
         conn.execute("UPDATE collection_runs SET finished_at = datetime('now'), ok = ?, message = ? WHERE id = ?",
                      (int(ok), message, run_id))
+    if ok and snapshot:
+        from app import scoring
+        scoring.snapshot_all()
     return {"ok": ok, "message": message, "saved": saved}
 
 

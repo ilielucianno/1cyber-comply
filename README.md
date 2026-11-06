@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.4.0) — stage 2b, OPNsense collector.
+**Status:** early development (v0.5.0) — stage 3, automatic collection and compliance score.
 
 ## Why
 
@@ -19,8 +19,8 @@ for free, using tools many teams already run.
 | 1 | NIS2 Art. 21 control catalogue (41 controls) | done |
 | 2a | Wazuh collector (Server API + Indexer): 7 automated checks | done |
 | 2b | OPNsense collector: 6 automated checks | done |
-| 3 | Scheduled collection, compliance score and history | next |
-| 4 | PDF reports, manual evidence upload | planned |
+| 3 | Scheduled collection, compliance score and history | done |
+| 4 | Manual evidence upload, PDF reports | next |
 | 5 | Login, user accounts, HTTPS — required before exposing the app on a network | planned |
 | 6 | One-line installer, .deb package | planned |
 
@@ -42,6 +42,16 @@ pip install -r requirements.txt pytest
 pytest -q
 uvicorn app.main:app --reload --port 8080
 ```
+
+## Compliance score
+
+The score is the share of a framework's controls with **passing** evidence. Failed, unknown
+and not-yet-evidenced controls all count as not passing, so the score never claims more
+than has been proven. The dashboard shows the overall score, the automated-controls score
+and a history chart; a snapshot is stored after every collection.
+
+Collection runs automatically every `COLLECT_INTERVAL_HOURS` (default 24, `0` disables it).
+The internal check `nis2-f-03` passes only while automatic collection keeps running.
 
 ## Connecting Wazuh
 

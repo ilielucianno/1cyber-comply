@@ -366,19 +366,37 @@ class WazuhCollector(BaseCollector):
                            f"7-11: {levels.get('medium', 0)}). Alert review is documented manually.", raw)
 
     def _check_vulnerabilities(self, idx: WazuhIndexer) -> CheckResult:
+        critical = {"term": {"vulnerability.severity": "Critical"}}
         resp = idx.search("wazuh-states-vulnerabilities-*", {
             "size": 0, "track_total_hits": True,
-            "aggs": {"severity": {"terms": {"field": "vulnerability.severity", "size": 10}}},
+            "aggs": {
+                "severity": {"terms": {"field": "vulnerability.severity", "size": 10}},
+                "critical": {"filter": critical, "aggs": {
+                    "by_agent": {"terms": {"field": "agent.name", "size": 10}},
+                    "by_package": {"terms": {"field": "package.name", "size": 5}},
+                }},
+            },
         })
         if resp is None:
             return CheckResult("vulnerabilities", UNKNOWN,
                                "The vulnerability index does not exist: is Vulnerability Detection enabled?")
-        sev = {b["key"]: b["doc_count"] for b in resp["aggregations"]["severity"]["buckets"]}
+        aggs = resp.get("aggregations", {})
+        sev = {b["key"]: b["doc_count"] for b in aggs.get("severity", {}).get("buckets", [])}
+        crit = aggs.get("critical", {})
+        by_agent = {b["key"]: b["doc_count"] for b in crit.get("by_agent", {}).get("buckets", [])}
+        by_package = {b["key"]: b["doc_count"] for b in crit.get("by_package", {}).get("buckets", [])}
         total = resp["hits"]["total"]["value"]
-        raw = {"total": total, "by_severity": sev}
+        raw = {"total": total, "by_severity": sev,
+               "critical_by_agent": by_agent, "critical_top_packages": by_package}
         summary = ", ".join(f"{k}: {v}" for k, v in sorted(sev.items())) or "none"
         if sev.get("Critical", 0) > 0:
+            where = ""
+            if by_agent:
+                where += " On: " + ", ".join(f"{a} ({n})" for a, n in by_agent.items()) + "."
+            if by_package:
+                where += " Top packages: " + ", ".join(f"{pk} ({n})" for pk, n in by_package.items()) + "."
             return CheckResult("vulnerabilities", FAIL,
-                               f"{sev['Critical']} open critical vulnerabilities. Total {total} ({summary}).", raw)
+                               f"{sev['Critical']} open critical vulnerabilities.{where} "
+                               f"Total {total} ({summary}).", raw)
         return CheckResult("vulnerabilities", PASS,
                            f"No critical vulnerabilities. Total {total} ({summary}).", raw)

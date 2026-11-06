@@ -46,6 +46,21 @@ CREATE TABLE IF NOT EXISTS collection_runs (
     ok          INTEGER NOT NULL DEFAULT 0,
     message     TEXT
 );
+
+CREATE TABLE IF NOT EXISTS score_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    framework_id TEXT NOT NULL REFERENCES frameworks(id),
+    taken_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    score        REAL NOT NULL,            -- % of all controls with passing evidence
+    automated_score REAL,                  -- % of automated controls passing
+    passed       INTEGER NOT NULL,
+    failed       INTEGER NOT NULL,
+    unknown      INTEGER NOT NULL,
+    missing      INTEGER NOT NULL,         -- controls without any evidence yet
+    total        INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_score_fw ON score_history(framework_id, taken_at);
 """
 
 

@@ -39,6 +39,18 @@
   button { background:#21262d; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 12px; font-size:13px; cursor:pointer; }
   button:hover { border-color:var(--accent); }
   form { display:inline; }
+  .score { display:flex; gap:24px; align-items:center; flex-wrap:wrap; }
+  .score .big { font-size:48px; font-weight:700; line-height:1; }
+  .score .sub { color:var(--muted); font-size:13px; }
+  .bar { height:8px; background:#2a333d; border-radius:4px; overflow:hidden; margin-top:6px; width:220px; }
+  .bar > span { display:block; height:100%; background:var(--ok); }
+  svg .g { stroke:#2a333d; stroke-width:1; }
+  svg .t { fill:var(--muted); font-size:11px; font-family:inherit; }
+  svg .l { fill:none; stroke:var(--accent); stroke-width:2; }
+  svg .la { fill:none; stroke:var(--ok); stroke-width:1.5; stroke-dasharray:4 3; }
+  svg .d { fill:var(--accent); }
+  .legend { font-size:12px; color:var(--muted); }
+  .legend i { display:inline-block; width:14px; height:2px; vertical-align:middle; margin:0 4px 0 10px; }
   .evidence { font-size:13px; margin-top:6px; padding:6px 10px; background:#0f1419; border-radius:6px; }
 </style>
 </head>

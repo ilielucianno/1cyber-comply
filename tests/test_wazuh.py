@@ -75,7 +75,12 @@ def fake_indexer(request: httpx.Request) -> httpx.Response:
             "hits": {"total": {"value": 57}},
             "aggregations": {"severity": {"buckets": [
                 {"key": "High", "doc_count": 20}, {"key": "Medium", "doc_count": 33},
-                {"key": "Critical", "doc_count": 4}]}}})
+                {"key": "Critical", "doc_count": 4}]},
+                "critical": {"doc_count": 4,
+                             "by_agent": {"buckets": [{"key": "win-host", "doc_count": 3},
+                                                      {"key": "db01", "doc_count": 1}]},
+                             "by_package": {"buckets": [{"key": "Mozilla Firefox", "doc_count": 2},
+                                                        {"key": "openssl", "doc_count": 1}]}}}})
     return httpx.Response(200, json={"version": {"number": "2.19"}})
 
 
@@ -115,6 +120,7 @@ def test_all_checks_produce_expected_status(wazuh_env):
     assert r["syscollector"].status == "pass" and "1452 packages" in r["syscollector"].summary
     assert r["alerts_recent"].status == "pass" and "1234" in r["alerts_recent"].summary
     assert r["vulnerabilities"].status == "fail" and "4 open critical vulnerabilities" in r["vulnerabilities"].summary
+    assert "win-host (3)" in r["vulnerabilities"].summary and "Mozilla Firefox (2)" in r["vulnerabilities"].summary
 
 
 def test_manager_agent_is_excluded(wazuh_env):
