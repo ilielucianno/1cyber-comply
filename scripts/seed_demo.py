@@ -52,6 +52,15 @@ evidence.save_results("opnsense", [
     CheckResult("webgui_https", "pass", "Web GUI uses HTTPS; plain HTTP redirects to HTTPS."),
     CheckResult("vlans", "pass", "4 VLAN(s) configured (tags: 10, 20, 30, 99)."),
 ])
+evidence.save_results("microsoft365", [
+    CheckResult("mfa", "fail", "MFA enforced (Conditional Access policy 'Require MFA for all users' requires MFA for "
+                "all users); 56/58 enabled accounts have MFA registered. Without MFA: reception@example.com, "
+                "warehouse@example.com."),
+    CheckResult("privileged_accounts", "pass", "5 accounts hold admin roles, 3 of them Global Administrator. "
+                "All admins have MFA registered."),
+    CheckResult("stale_accounts", "fail", "2 enabled accounts unused for 90+ days: m.georgiou@example.com (member), "
+                "auditor-2024@example.com (guest)."),
+])
 evidence.save_results("comply", [CheckResult("score_history", "pass",
                                              "Compliance is measured automatically every 24h (30 score snapshots recorded).")])
 
