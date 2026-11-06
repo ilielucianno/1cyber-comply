@@ -86,8 +86,6 @@ def add_manual_evidence(control_id: str, status: str, note: str, reviewer: str,
         row = conn.execute("SELECT check_type FROM controls WHERE id = ?", (control_id,)).fetchone()
         if not row:
             raise EvidenceError(f"Unknown control {control_id}.")
-        if row["check_type"] != "manual":
-            raise EvidenceError("This control is verified automatically; manual evidence is not accepted.")
         ev_id = conn.execute(
             """INSERT INTO evidence (control_id, source, status, summary, raw_json, reviewer, valid_until)
                VALUES (?, 'manual', ?, ?, '{}', ?, ?)""",

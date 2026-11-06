@@ -13,8 +13,13 @@
   {% if control.evidence_hint %}<div style="margin-top:8px;font-size:14px">Expected evidence: <span class="muted">{{ control.evidence_hint }}</span></div>{% endif %}
 </div>
 
-{% if control.check_type == 'manual' and request.state.user.role in ('admin', 'editor') %}
-<h2>Add evidence</h2>
+{% if request.state.user.role in ('admin', 'editor') %}
+<h2>{{ 'Add evidence' if control.check_type == 'manual' else 'Add manual evidence' }}</h2>
+{% if control.check_type != 'manual' %}
+<p class="muted" style="font-size:14px;margin-top:-4px">This control is checked automatically ({{ control.automation }}).
+  Add manual evidence when you cover it with a tool that is not connected, e.g. OpenVPN instead of WireGuard.
+  If any source reports a failure, the control fails.</p>
+{% endif %}
 <div class="card">
   <form method="post" action="/controls/{{ framework.id }}/{{ control.id }}/evidence" enctype="multipart/form-data" class="form">
     <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">

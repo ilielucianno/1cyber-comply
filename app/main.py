@@ -33,8 +33,7 @@ def _number(x: float) -> str:
 
 templates.env.filters["filesize"] = _filesize
 templates.env.filters["number"] = _number
-templates.env.globals["source_label"] = {"wazuh": "Wazuh", "opnsense": "OPNsense", "comply": "1cyber Comply",
-                                         "manual": "manual"}
+templates.env.globals["source_label"] = evidence.SOURCE_LABELS
 
 
 @asynccontextmanager
@@ -86,6 +85,7 @@ def _sources() -> dict:
     return {
         "wazuh": bool(config.WAZUH_URL and config.WAZUH_USER),
         "opnsense": bool(config.OPNSENSE_URL and config.OPNSENSE_KEY),
+        "microsoft365": bool(config.M365_TENANT_ID and config.M365_CLIENT_ID),
     }
 
 

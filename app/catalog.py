@@ -20,6 +20,14 @@ class CatalogError(ValueError):
     pass
 
 
+def automation_keys(value) -> list[str]:
+    """`automation` in YAML may be one 'source:check' string or a list of them."""
+    if not value:
+        return []
+    items = value if isinstance(value, list) else str(value).split(",")
+    return [str(i).strip() for i in items if str(i).strip()]
+
+
 def validate(data: dict, source: str) -> None:
     """Stop loading with a clear message if the YAML file has mistakes."""
     fw = data.get("framework") or {}
@@ -41,8 +49,11 @@ def validate(data: dict, source: str) -> None:
             ctype = ctl.get("check_type", "manual")
             if ctype not in VALID_CHECK_TYPES:
                 raise CatalogError(f"{source}: {cid} has invalid check_type '{ctype}'")
-            if ctype == "automated" and not ctl.get("automation"):
+            if ctype == "automated" and not automation_keys(ctl.get("automation")):
                 raise CatalogError(f"{source}: {cid} is automated but has no 'automation'")
+            for key in automation_keys(ctl.get("automation")):
+                if ":" not in key:
+                    raise CatalogError(f"{source}: {cid} automation '{key}' must look like source:check")
 
 
 def load_file(path: Path) -> tuple[str, int]:
@@ -59,7 +70,7 @@ def load_file(path: Path) -> tuple[str, int]:
                 ctl["id"], fw["id"], cat["reference"], ctl["title"],
                 (ctl.get("description") or "").strip(),
                 ctl.get("check_type", "manual"),
-                cat["id"], cat["title"], ctl.get("automation"),
+                cat["id"], cat["title"], ",".join(automation_keys(ctl.get("automation"))) or None,
                 (ctl.get("evidence_hint") or "").strip(), order,
             ))
 

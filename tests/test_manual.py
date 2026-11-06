@@ -5,6 +5,7 @@ import pytest
 from helpers import LoggedInClient
 
 from app import evidence, manual, scoring
+from app.collectors.base import CheckResult
 from app.db import get_conn
 from app.main import app
 
@@ -73,9 +74,33 @@ def test_invalid_input_is_rejected(client, overrides, files, message):
     assert "nis2-a-01" not in evidence.latest_by_control("nis2")
 
 
-def test_manual_evidence_refused_on_automated_control(client):
-    with pytest.raises(manual.EvidenceError, match="automatically"):
-        manual.add_manual_evidence("nis2-b-02", "pass", "x", "y", None)
+def test_manual_evidence_resolves_unknown_on_automated_control(client):
+    """E.g. OpenVPN in use: the WireGuard check is unknown, a manual record proves the control."""
+    evidence.save_results("opnsense", [CheckResult("vpn", "unknown", "No active WireGuard instance.")])
+    assert evidence.latest_by_control("nis2")["nis2-h-02"]["status"] == "unknown"
+    manual.add_manual_evidence("nis2-h-02", "pass", "Remote access via OpenVPN with certificates.", "it", NEXT_YEAR)
+    e = evidence.latest_by_control("nis2")["nis2-h-02"]
+    assert e["status"] == "pass" and len(e["parts"]) == 2
+    assert "OPNsense:" in e["summary"] and "manual:" in e["summary"]
+
+
+def test_any_failing_source_fails_the_control(client):
+    manual.add_manual_evidence("nis2-h-02", "pass", "VPN documented.", "it", NEXT_YEAR)
+    evidence.save_results("opnsense", [CheckResult("vpn", "fail", "VPN service stopped.")])
+    assert evidence.latest_by_control("nis2")["nis2-h-02"]["status"] == "fail"
+    evidence.save_results("opnsense", [CheckResult("vpn", "pass", "WireGuard running.")])
+    assert evidence.latest_by_control("nis2")["nis2-h-02"]["status"] == "pass"   # latest per source counts
+
+
+def test_one_check_can_feed_several_controls_and_lists_are_accepted(client):
+    from app import catalog
+    keys = catalog.automation_keys(["opnsense:vpn", " microsoft365:mfa "])
+    assert keys == ["opnsense:vpn", "microsoft365:mfa"]
+    assert catalog.automation_keys("a:b, c:d") == ["a:b", "c:d"]
+    with pytest.raises(catalog.CatalogError, match="source:check"):
+        catalog.validate({"framework": {"id": "x", "name": "X"}, "categories": [{"id": "a", "reference": "r",
+                          "title": "t", "controls": [{"id": "x-1", "title": "T", "check_type": "automated",
+                                                      "automation": "nocolon"}]}]}, "t.yaml")
 
 
 def test_unknown_control_and_attachment_404(client):

@@ -19,21 +19,21 @@ management or auditors.
 NIS2 requires thousands of mid-sized EU organisations to prove their cybersecurity
 measures. Commercial compliance platforms typically cost five figures per year.
 1cyber Comply does the core of that job for free, on your own server, using tools many
-teams already have: **Wazuh** and **OPNsense**.
+teams already have: **Wazuh**, **OPNsense** and **Microsoft 365**.
 
 ## What it does
 
 | | |
 |---|---|
 | **41 NIS2 controls** | Article 21(2)(a)–(j) and Article 23, each broken down into checks you can actually verify |
-| **14 automated checks** | Wazuh: agents, versions, CIS hardening (SCA), file integrity, inventory, alerts, vulnerabilities by host and package. OPNsense: firmware currency, active firewall ruleset, IDS/IPS, VPN, HTTPS admin, VLAN segmentation. Plus a check that monitoring itself keeps running |
-| **Manual evidence** | Pass/fail assessment, note, file, reviewer and validity date. Expired evidence turns red automatically |
+| **17 automated checks** | Wazuh: agents, versions, CIS hardening (SCA), file integrity, inventory, alerts, vulnerabilities by host and package. OPNsense: firmware currency, active firewall ruleset, IDS/IPS, VPN, HTTPS admin, VLAN segmentation. Microsoft 365: MFA enforcement and coverage, admin accounts, unused accounts. Plus a check that monitoring itself keeps running |
+| **Manual evidence** | On any control: pass/fail assessment, note, file, reviewer and validity date. Expired evidence turns red automatically. Combines with automated sources |
 | **Compliance score** | Only proven controls count. History chart, collection every 24 h |
 | **PDF report** | Score, findings to fix, every control with its evidence, file hashes |
 | **Built for audits** | Roles (viewer / editor / admin), audit log of every action, evidence history per control |
 | **Read-only by design** | Never changes anything on your systems. Minimal privileges documented below |
 
-**Works with:** Wazuh and OPNsense today; Zenarmor, Microsoft 365 / Entra ID, Microsoft
+**Works with:** Wazuh, OPNsense and Microsoft 365 / Entra ID today; Zenarmor, Microsoft
 Defender, FortiGate, Sophos, CrowdSec and Proxmox are planned. Any other tool can be covered
 with manual evidence. See the full list in [INTEGRATIONS.md](INTEGRATIONS.md).
 
@@ -139,6 +139,14 @@ Firmware currency is checked against the latest public OPNsense release on GitHu
 (`OPNSENSE_CHECK_LATEST=false` on offline networks). Create the API key under
 System → Access → Users and set `OPNSENSE_URL`, `OPNSENSE_KEY`, `OPNSENSE_SECRET` in `.env`.
 
+## Connecting Microsoft 365
+
+Register a read-only app in Entra ID, grant the Graph application permissions `User.Read.All`,
+`Policy.Read.All`, `RoleManagement.Read.Directory` and `AuditLog.Read.All` (plus
+`UserAuthenticationMethod.Read.All` without Entra ID P1), and set `M365_TENANT_ID`,
+`M365_CLIENT_ID`, `M365_CLIENT_SECRET` in `.env`. Step by step:
+[docs/microsoft365-setup.md](docs/microsoft365-setup.md).
+
 ## How the score works
 
 The score is the share of controls with **current passing evidence**. Failed, unknown,
@@ -186,14 +194,14 @@ app/
   main.py            routes and UI
   guard.py           login, roles and CSRF on every request
   auth.py            users, scrypt, sessions, lockout, audit log
-  collectors/        wazuh.py, opnsense.py, comply.py - one module per source
+  collectors/        wazuh.py, opnsense.py, microsoft365.py, comply.py - one module per source
   evidence.py        stores results as evidence on controls
   scoring.py         compliance score, history, chart
   manual.py          manual evidence and file uploads
   report.py          PDF report (ReportLab)
   scheduler.py       automatic collection
 controls/nis2.yaml   control catalogue - add a framework by adding a YAML file
-tests/               78 tests, Wazuh and OPNsense simulated, no network needed
+tests/               89 tests, Wazuh, OPNsense and Microsoft Graph simulated, no network needed
 ```
 
 Stack: Python 3.12, FastAPI, SQLite, Jinja2, ReportLab, Docker. All dependencies use
@@ -209,7 +217,7 @@ uvicorn app.main:app --reload --port 8080
 ```
 
 See [CONTRIBUTING.md](CONTRIBUTING.md). Ideas on the roadmap: ISO 27001 and DORA catalogues,
-Microsoft 365 / Entra ID and Proxmox collectors, evidence reminders by email.
+Zenarmor and Proxmox collectors, evidence reminders by email.
 
 ## Support and services
 

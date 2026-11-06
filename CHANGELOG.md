@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.1.0 - 2026-11-06
+
+- **Microsoft 365 / Entra ID collector (beta)**: MFA enforcement (security defaults or Conditional
+  Access) and registration coverage, Global Administrator count and admin MFA, accounts unused for
+  90+ days. Read-only Graph app registration; works without Entra ID P1 with reduced coverage.
+  Setup guide in docs/microsoft365-setup.md
+- **Evidence from several sources per control**: the latest result of each source is combined;
+  any failure fails the control, *unknown* does not hide a definitive result
+- **Manual evidence on every control**, including automated ones (e.g. OpenVPN instead of WireGuard)
+- NIS2 controls 21(2)(i) least privilege, joiner/mover/leaver and 21(2)(j) MFA are now automated
+  with Microsoft 365 (17 automated controls)
+- INTEGRATIONS.md: supported and planned tools
+
 ## v1.0.0 - 2026-11-06
 
 First public release.

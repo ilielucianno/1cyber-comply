@@ -246,15 +246,17 @@ categories:
         automation: wazuh:syscollector
         evidence_hint: Inventory of hosts, operating systems and installed packages.
       - id: nis2-i-02
-        title: Access control policy
-        description: Access is granted on least privilege and need-to-know, with a defined approval process.
-        check_type: manual
-        evidence_hint: Access control policy and sample access requests.
+        title: Least privilege for administrative access
+        description: Access is granted on least privilege and need-to-know; administrative roles are held by few, named accounts protected with MFA.
+        check_type: automated
+        automation: microsoft365:privileged_accounts
+        evidence_hint: Access control policy, plus the list of admin role holders (Microsoft 365) or an equivalent export from your directory.
       - id: nis2-i-03
         title: Joiner, mover, leaver process
-        description: Accounts are created, changed and removed promptly when staff join, change role or leave.
-        check_type: manual
-        evidence_hint: HR-IT offboarding checklist and recent leaver records.
+        description: Accounts are created, changed and removed promptly when staff join, change role or leave; unused accounts are disabled.
+        check_type: automated
+        automation: microsoft365:stale_accounts
+        evidence_hint: HR-IT offboarding checklist, recent leaver records and a list of unused accounts (Microsoft 365 or your directory).
       - id: nis2-i-04
         title: Periodic access review
         description: User and privileged access rights are reviewed at least twice a year.
@@ -274,8 +276,9 @@ categories:
       - id: nis2-j-01
         title: MFA for remote and privileged access
         description: Multi-factor authentication is required for remote access, administrator accounts and cloud services.
-        check_type: manual
-        evidence_hint: MFA enforcement settings and coverage report.
+        check_type: automated
+        automation: microsoft365:mfa
+        evidence_hint: MFA enforcement settings and coverage report (automatic for Microsoft 365; otherwise an export from your identity provider).
       - id: nis2-j-02
         title: MFA on firewall administration
         description: Administrator login to the firewall requires a second factor.

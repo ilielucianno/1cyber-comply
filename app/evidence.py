@@ -11,9 +11,11 @@ log = logging.getLogger("comply.evidence")
 
 def get_collectors() -> dict[str, BaseCollector]:
     from app.collectors.comply import ComplyCollector
+    from app.collectors.microsoft365 import Microsoft365Collector
     from app.collectors.opnsense import OPNsenseCollector
     from app.collectors.wazuh import WazuhCollector
-    return {"wazuh": WazuhCollector(), "opnsense": OPNsenseCollector(), "comply": ComplyCollector()}
+    return {"wazuh": WazuhCollector(), "opnsense": OPNsenseCollector(),
+            "microsoft365": Microsoft365Collector(), "comply": ComplyCollector()}
 
 
 def save_results(source: str, results: list[CheckResult]) -> int:
@@ -22,7 +24,7 @@ def save_results(source: str, results: list[CheckResult]) -> int:
     with get_conn() as conn:
         for r in results:
             control_ids = [row["id"] for row in conn.execute(
-                "SELECT id FROM controls WHERE automation = ?", (f"{source}:{r.check}",))]
+                "SELECT id FROM controls WHERE ',' || automation || ',' LIKE ?", (f"%,{source}:{r.check},%",))]
             if not control_ids:
                 log.info("Check %s:%s is not linked to any control", source, r.check)
             for cid in control_ids:
@@ -81,14 +83,49 @@ def effective(e: dict, today: str | None = None) -> dict:
     return e
 
 
+SOURCE_LABELS = {"wazuh": "Wazuh", "opnsense": "OPNsense", "microsoft365": "Microsoft 365",
+                 "comply": "1cyber Comply", "manual": "manual"}
+
+
+def combine(parts: list[dict]) -> dict:
+    """One status per control from the latest result of every source.
+
+    'unknown' from one source does not hide a definitive answer from another
+    (e.g. a manual record for OpenVPN when no WireGuard instance exists);
+    any definitive fail makes the control fail; otherwise it passes.
+    """
+    parts = sorted(parts, key=lambda e: e["id"], reverse=True)
+    definitive = [e["status"] for e in parts if e["status"] != "unknown"]
+    status = "unknown" if not definitive else ("fail" if "fail" in definitive else "pass")
+    multi = len(parts) > 1
+    manual = next((e for e in parts if e["source"] == "manual"), None)
+    return {
+        "control_id": parts[0]["control_id"],
+        "status": status,
+        "summary": " | ".join(
+            (f"{SOURCE_LABELS.get(e['source'], e['source'])}: " if multi else "") + (e["summary"] or "")
+            for e in parts),
+        "source": ", ".join(SOURCE_LABELS.get(e["source"], e["source"]) for e in parts),
+        "collected_at": parts[0]["collected_at"],
+        "reviewer": manual["reviewer"] if manual else None,
+        "valid_until": manual["valid_until"] if manual else None,
+        "expired": any(e.get("expired") for e in parts),
+        "attachment_count": sum(e.get("attachment_count") or 0 for e in parts),
+        "parts": parts,
+    }
+
+
 def latest_by_control(framework_id: str) -> dict[str, dict]:
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT e.*, (SELECT COUNT(*) FROM attachments a WHERE a.evidence_id = e.id) AS attachment_count
                FROM evidence e JOIN controls c ON c.id = e.control_id
                WHERE c.framework_id = ? AND e.id IN
-                 (SELECT MAX(id) FROM evidence GROUP BY control_id)""", (framework_id,)).fetchall()
-    return {r["control_id"]: effective(dict(r)) for r in rows}
+                 (SELECT MAX(id) FROM evidence GROUP BY control_id, source)""", (framework_id,)).fetchall()
+    by_control: dict[str, list] = {}
+    for r in rows:
+        by_control.setdefault(r["control_id"], []).append(effective(dict(r)))
+    return {cid: combine(parts) for cid, parts in by_control.items()}
 
 
 def history_for_control(control_id: str) -> list[dict]:

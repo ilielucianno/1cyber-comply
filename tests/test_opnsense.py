@@ -187,5 +187,5 @@ def test_collection_saves_on_nis2_controls(opn_env):
         assert result["ok"] and result["saved"] == 6
         latest = evidence.latest_by_control("nis2")
         for cid in ("nis2-e-02", "nis2-g-03", "nis2-g-04", "nis2-h-02", "nis2-h-03", "nis2-i-05"):
-            assert latest[cid]["source"] == "opnsense"
+            assert latest[cid]["parts"][0]["source"] == "opnsense"
         assert "nis2-c-02" not in latest and "nis2-j-02" not in latest   # manual controls
