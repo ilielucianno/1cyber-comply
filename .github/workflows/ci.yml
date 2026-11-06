@@ -1,0 +1,26 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install dependencies
+        run: pip install -r requirements.txt pytest
+      - name: Run tests
+        run: python -m pytest -q
+      - name: Lint shell scripts
+        run: shellcheck get.sh install.sh docker/entrypoint.sh packaging/build-deb.sh packaging/debian/*
+      - name: Build .deb
+        run: packaging/build-deb.sh

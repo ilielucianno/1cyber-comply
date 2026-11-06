@@ -1,0 +1,22 @@
+#!/bin/sh
+# Configure 1cyber Comply after the package files are in /opt/1cyber-comply.
+set -e
+DIR=/opt/1cyber-comply
+
+if [ "$1" = "configure" ]; then
+  if [ ! -f "$DIR/.env" ]; then
+    cp "$DIR/.env.example" "$DIR/.env"
+    sed -i 's/^COMPLY_TLS=.*/COMPLY_TLS=true/' "$DIR/.env"
+    sed -i "s/^COMPLY_TLS_HOSTNAME=.*/COMPLY_TLS_HOSTNAME=$(hostname)/" "$DIR/.env"
+    chmod 600 "$DIR/.env"
+    echo "1cyber Comply: created $DIR/.env (HTTPS enabled). Add your Wazuh/OPNsense details there."
+  fi
+  echo "1cyber Comply: building and starting the container, this can take a few minutes..."
+  if (cd "$DIR" && docker compose up -d --build --remove-orphans); then
+    echo "1cyber Comply is running: https://127.0.0.1:8080 (first visit: create the administrator)"
+  else
+    echo "1cyber Comply: could not start the container now. Check Docker, then run:"
+    echo "  cd $DIR && sudo docker compose up -d --build"
+  fi
+fi
+exit 0

@@ -1,0 +1,9 @@
+#!/bin/sh
+# Stop the container before removal or upgrade. Data in the Docker volume is kept.
+set -e
+if [ "$1" = "remove" ] || [ "$1" = "upgrade" ]; then
+  if [ -f /opt/1cyber-comply/docker-compose.yml ] && command -v docker >/dev/null 2>&1; then
+    (cd /opt/1cyber-comply && docker compose down) || true
+  fi
+fi
+exit 0

@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.7.0) — stage 5, login, roles and HTTPS.
+**Status:** early development (v0.8.0) — stage 6, one-line installer and .deb package.
 
 ## Why
 
@@ -22,17 +22,40 @@ for free, using tools many teams already run.
 | 3 | Scheduled collection, compliance score and history | done |
 | 4 | Manual evidence upload, PDF reports | done |
 | 5 | Login, roles, CSRF protection, audit log, HTTPS | done |
-| 6 | One-line installer, .deb package | next |
+| 6 | One-line installer, .deb package, CI and releases | done |
 
-## Quick start (Docker)
+## Install
+
+Requirements: Ubuntu or Debian with internet access. Docker is installed for you if missing.
+
+**One-line installer** (install and upgrade):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ilielucianno/1cyber-comply/main/get.sh | sudo bash
+```
+
+It installs into `/opt/1cyber-comply`, enables HTTPS with a self-signed certificate and keeps
+your `.env` and data on every upgrade. Read the script first; it is short.
+
+**Debian package:** download the `.deb` from the latest
+[release](https://github.com/ilielucianno/1cyber-comply/releases), then:
+
+```bash
+sudo apt install ./1cyber-comply_*_all.deb
+```
+
+`apt remove 1cyber-comply` stops it and keeps settings and data;
+`apt purge 1cyber-comply` deletes them.
+
+**From source:**
 
 ```bash
 git clone https://github.com/ilielucianno/1cyber-comply.git
-cd 1cyber-comply
-./install.sh
+cd 1cyber-comply && ./install.sh
 ```
 
-Open http://127.0.0.1:8080
+Then open `https://<server>:8080` (or `http://127.0.0.1:8080` from source) and create the
+administrator account. Connection settings live in `/opt/1cyber-comply/.env`.
 
 ## Development (without Docker)
 

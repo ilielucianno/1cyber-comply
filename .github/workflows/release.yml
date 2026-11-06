@@ -1,0 +1,32 @@
+name: Release
+
+# Push a tag like v1.0.0 to publish a GitHub release with the .deb attached.
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Tag must match APP_VERSION
+        run: |
+          app=$(grep -oP 'APP_VERSION = "\K[^"]+' app/config.py)
+          [ "v$app" = "$GITHUB_REF_NAME" ] || { echo "Tag $GITHUB_REF_NAME != v$app"; exit 1; }
+      - name: Run tests
+        run: |
+          pip install -r requirements.txt pytest
+          python -m pytest -q
+      - name: Build .deb
+        run: packaging/build-deb.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "$GITHUB_REF_NAME" dist/*.deb --title "1cyber Comply $GITHUB_REF_NAME" --generate-notes

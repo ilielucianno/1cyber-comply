@@ -1,9 +1,11 @@
 #!/usr/bin/env bash
-# 1cyber Comply installer (Ubuntu/Debian with Docker already installed)
+# Start 1cyber Comply from a cloned repository (developers / manual installs).
+# For servers, prefer the one-line installer: see README (get.sh).
 set -euo pipefail
+cd "$(dirname "$0")"
 
-if ! command -v docker >/dev/null 2>&1; then
-  echo "[!] Docker is not installed. See: https://docs.docker.com/engine/install/ubuntu/"
+if ! docker compose version >/dev/null 2>&1; then
+  echo "[!] Docker with Compose v2 is required. See: https://docs.docker.com/engine/install/"
   exit 1
 fi
 
@@ -14,4 +16,6 @@ if [ ! -f .env ]; then
 fi
 
 docker compose up -d --build
-echo "[+] 1cyber Comply is running: http://127.0.0.1:8080"
+scheme=http
+grep -q '^COMPLY_TLS=true' .env && scheme=https
+echo "[+] 1cyber Comply is running: ${scheme}://127.0.0.1:8080"
