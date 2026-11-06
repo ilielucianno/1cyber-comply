@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.1.0) — stage 0, project foundation.
+**Status:** early development (v0.2.0) — stage 1, NIS2 control catalogue.
 
 ## Why
 
@@ -16,8 +16,8 @@ for free, using tools many teams already run.
 | Stage | Scope | Status |
 |---|---|---|
 | 0 | Project foundation, database, web UI, Docker | done |
-| 1 | NIS2 Art. 21 control catalogue (YAML) | next |
-| 2 | Collectors: Wazuh API, OPNsense API | planned |
+| 1 | NIS2 Art. 21 control catalogue (41 controls) | done |
+| 2 | Collectors: Wazuh API, OPNsense API | next |
 | 3 | Evidence-to-control mapping, compliance score | planned |
 | 4 | PDF reports, manual evidence upload | planned |
 | 5 | One-line installer, .deb package | planned |

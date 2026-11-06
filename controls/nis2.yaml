@@ -1,0 +1,292 @@
+# 1cyber Comply - NIS2 control catalogue
+#
+# Source: Directive (EU) 2022/2555 (NIS2), Article 21(2) points (a)-(j) and Article 23.
+# EU legal texts may be reused freely (Commission Decision 2011/833/EU).
+# Control titles and descriptions below are original wording by the 1cyber Comply project,
+# breaking each legal requirement into checks an organisation can actually verify.
+#
+# Field reference:
+#   check_type: automated -> evidence collected by a collector (stage 2)
+#               manual    -> evidence uploaded by the user (policy, record, screenshot)
+#   automation: <source>:<check> used by collectors; only for automated controls
+#   evidence_hint: what an auditor would expect to see
+
+framework:
+  id: nis2
+  name: NIS2 Directive
+  version: "(EU) 2022/2555"
+  description: >
+    Cybersecurity risk-management measures required from essential and important
+    entities under Article 21, plus incident reporting duties under Article 23.
+
+categories:
+  - id: a
+    reference: "Art. 21(2)(a)"
+    title: Risk analysis and information security policies
+    controls:
+      - id: nis2-a-01
+        title: Information security policy approved by management
+        description: A written information security policy exists, is approved by the management body and reviewed at least yearly.
+        check_type: manual
+        evidence_hint: Signed policy document with approval date and next review date.
+      - id: nis2-a-02
+        title: Cybersecurity risk assessment performed
+        description: Risks to network and information systems are identified, rated and documented, with owners and treatment decisions.
+        check_type: manual
+        evidence_hint: Risk register with likelihood, impact, owner and treatment for each risk.
+      - id: nis2-a-03
+        title: Management accountability for cybersecurity
+        description: The management body oversees cybersecurity measures and its members have received cybersecurity training (Art. 20).
+        check_type: manual
+        evidence_hint: Board minutes and training attendance records for management.
+      - id: nis2-a-04
+        title: Security configuration baseline applied
+        description: Systems are checked against a hardening baseline and the compliance score is tracked.
+        check_type: automated
+        automation: wazuh:sca
+        evidence_hint: SCA policy results per agent with pass/fail percentage.
+
+  - id: b
+    reference: "Art. 21(2)(b), Art. 23"
+    title: Incident handling
+    controls:
+      - id: nis2-b-01
+        title: Incident response procedure documented
+        description: A procedure defines how incidents are detected, classified, escalated, contained and closed, with named roles.
+        check_type: manual
+        evidence_hint: Incident response plan with roles, contacts and severity classification.
+      - id: nis2-b-02
+        title: Security monitoring active on all systems
+        description: Endpoints and servers send security events to a central monitoring system and agents are reporting.
+        check_type: automated
+        automation: wazuh:agents_active
+        evidence_hint: List of monitored agents with status and last keep-alive.
+      - id: nis2-b-03
+        title: Security alerts are generated and reviewed
+        description: The monitoring system produces alerts and high-severity alerts are being raised and handled.
+        check_type: automated
+        automation: wazuh:alerts_recent
+        evidence_hint: Alert counts by severity for the last 30 days.
+      - id: nis2-b-04
+        title: Incident reporting to the authority within deadlines
+        description: The organisation can send an early warning within 24 hours, an incident notification within 72 hours and a final report within one month to the CSIRT or competent authority.
+        check_type: manual
+        evidence_hint: Reporting procedure with CSIRT contact details and reporting templates.
+      - id: nis2-b-05
+        title: Incident log maintained
+        description: Every security incident is recorded with timeline, impact, actions taken and lessons learned.
+        check_type: manual
+        evidence_hint: Incident register covering the last 12 months.
+
+  - id: c
+    reference: "Art. 21(2)(c)"
+    title: Business continuity, backup and crisis management
+    controls:
+      - id: nis2-c-01
+        title: Business continuity and disaster recovery plan
+        description: A plan defines recovery priorities, recovery time objectives and the steps to restore critical services.
+        check_type: manual
+        evidence_hint: BCP/DRP document with RTO/RPO for critical systems.
+      - id: nis2-c-02
+        title: Firewall configuration backed up
+        description: The perimeter firewall configuration is backed up automatically and recent backups exist.
+        check_type: automated
+        automation: opnsense:config_backup
+        evidence_hint: Backup schedule and date of the most recent configuration backup.
+      - id: nis2-c-03
+        title: Data backups performed and tested
+        description: Critical data is backed up on a schedule, kept separately from production and restore tests are performed.
+        check_type: manual
+        evidence_hint: Backup job reports and the record of the last successful restore test.
+      - id: nis2-c-04
+        title: Crisis management and emergency contacts
+        description: A crisis team, decision-making roles and an out-of-band contact list are defined.
+        check_type: manual
+        evidence_hint: Crisis team list and emergency contact sheet.
+
+  - id: d
+    reference: "Art. 21(2)(d)"
+    title: Supply chain security
+    controls:
+      - id: nis2-d-01
+        title: Inventory of ICT suppliers and service providers
+        description: All suppliers with access to systems or data are listed with the service they provide and their criticality.
+        check_type: manual
+        evidence_hint: Supplier register with criticality rating.
+      - id: nis2-d-02
+        title: Security requirements in supplier contracts
+        description: Contracts with critical suppliers include security obligations, incident notification and audit rights.
+        check_type: manual
+        evidence_hint: Contract clauses or data processing agreements for critical suppliers.
+      - id: nis2-d-03
+        title: Supplier security assessed
+        description: The security posture of critical suppliers is reviewed before onboarding and periodically after.
+        check_type: manual
+        evidence_hint: Completed supplier questionnaires or certificates (e.g. ISO 27001, SOC 2).
+
+  - id: e
+    reference: "Art. 21(2)(e)"
+    title: Secure acquisition, development, maintenance and vulnerability handling
+    controls:
+      - id: nis2-e-01
+        title: Known vulnerabilities identified on systems
+        description: Systems are scanned for known vulnerabilities and critical findings are tracked.
+        check_type: automated
+        automation: wazuh:vulnerabilities
+        evidence_hint: Vulnerability findings by severity per system.
+      - id: nis2-e-02
+        title: Firewall firmware up to date
+        description: The perimeter firewall runs a current firmware version with no pending security updates.
+        check_type: automated
+        automation: opnsense:firmware
+        evidence_hint: Installed firmware version and pending update status.
+      - id: nis2-e-03
+        title: Monitoring agents up to date
+        description: Security agents run a version consistent with the central manager.
+        check_type: automated
+        automation: wazuh:agents_version
+        evidence_hint: Agent versions compared with the manager version.
+      - id: nis2-e-04
+        title: Patch management process
+        description: A documented process sets timelines for applying security patches according to severity.
+        check_type: manual
+        evidence_hint: Patch policy with remediation deadlines per severity.
+      - id: nis2-e-05
+        title: Vulnerability disclosure channel
+        description: External parties can report vulnerabilities through a published contact point.
+        check_type: manual
+        evidence_hint: Published security contact (e.g. security.txt) or disclosure policy.
+
+  - id: f
+    reference: "Art. 21(2)(f)"
+    title: Assessing the effectiveness of security measures
+    controls:
+      - id: nis2-f-01
+        title: Periodic review of security measures
+        description: The effectiveness of security measures is reviewed on a schedule and results are reported to management.
+        check_type: manual
+        evidence_hint: Internal audit or review report with findings and actions.
+      - id: nis2-f-02
+        title: Security testing performed
+        description: Penetration tests or technical security assessments are carried out and findings remediated.
+        check_type: manual
+        evidence_hint: Most recent test report and remediation tracking.
+      - id: nis2-f-03
+        title: Compliance status tracked continuously
+        description: Compliance with this framework is measured continuously rather than once a year.
+        check_type: automated
+        automation: comply:score_history
+        evidence_hint: Compliance score history from 1cyber Comply.
+
+  - id: g
+    reference: "Art. 21(2)(g)"
+    title: Cyber hygiene and cybersecurity training
+    controls:
+      - id: nis2-g-01
+        title: Security awareness training for all staff
+        description: All employees complete cybersecurity awareness training at onboarding and at least yearly.
+        check_type: manual
+        evidence_hint: Training records with completion dates per employee.
+      - id: nis2-g-02
+        title: File integrity monitoring on critical systems
+        description: Changes to critical files and configurations are detected and logged.
+        check_type: automated
+        automation: wazuh:fim
+        evidence_hint: FIM configuration and recent integrity events.
+      - id: nis2-g-03
+        title: Firewall rules restrict traffic by default
+        description: The perimeter firewall has active filtering rules and does not allow unrestricted traffic.
+        check_type: automated
+        automation: opnsense:firewall_rules
+        evidence_hint: Export of active firewall rules with any-to-any rules flagged.
+      - id: nis2-g-04
+        title: Intrusion detection or prevention enabled
+        description: Network traffic is inspected for known attack patterns.
+        check_type: automated
+        automation: opnsense:ids
+        evidence_hint: IDS/IPS service status and enabled rule sets.
+
+  - id: h
+    reference: "Art. 21(2)(h)"
+    title: Cryptography and encryption
+    controls:
+      - id: nis2-h-01
+        title: Cryptography policy
+        description: A policy defines where encryption is required, approved algorithms and key management responsibilities.
+        check_type: manual
+        evidence_hint: Cryptography and key management policy.
+      - id: nis2-h-02
+        title: Encrypted remote access
+        description: Remote access to internal networks goes through an encrypted VPN.
+        check_type: automated
+        automation: opnsense:vpn
+        evidence_hint: Configured VPN service (WireGuard/OpenVPN/IPsec) and its status.
+      - id: nis2-h-03
+        title: Management interfaces use encryption
+        description: Administrative interfaces of network devices are reachable only over HTTPS or SSH.
+        check_type: automated
+        automation: opnsense:webgui_https
+        evidence_hint: Web GUI protocol setting of the firewall.
+      - id: nis2-h-04
+        title: Data at rest encrypted on endpoints
+        description: Laptops and devices holding sensitive data use full-disk encryption.
+        check_type: manual
+        evidence_hint: Disk encryption status report from device management or a sample of devices.
+
+  - id: i
+    reference: "Art. 21(2)(i)"
+    title: Human resources security, access control and asset management
+    controls:
+      - id: nis2-i-01
+        title: Asset inventory maintained
+        description: Hardware and software assets are inventoried with an owner for each.
+        check_type: automated
+        automation: wazuh:syscollector
+        evidence_hint: Inventory of hosts, operating systems and installed packages.
+      - id: nis2-i-02
+        title: Access control policy
+        description: Access is granted on least privilege and need-to-know, with a defined approval process.
+        check_type: manual
+        evidence_hint: Access control policy and sample access requests.
+      - id: nis2-i-03
+        title: Joiner, mover, leaver process
+        description: Accounts are created, changed and removed promptly when staff join, change role or leave.
+        check_type: manual
+        evidence_hint: HR-IT offboarding checklist and recent leaver records.
+      - id: nis2-i-04
+        title: Periodic access review
+        description: User and privileged access rights are reviewed at least twice a year.
+        check_type: manual
+        evidence_hint: Signed access review records.
+      - id: nis2-i-05
+        title: Network segmentation
+        description: The network is divided into separate zones so that a compromise does not spread freely.
+        check_type: automated
+        automation: opnsense:vlans
+        evidence_hint: Configured VLANs and interfaces with inter-zone rules.
+
+  - id: j
+    reference: "Art. 21(2)(j)"
+    title: Multi-factor authentication and secure communications
+    controls:
+      - id: nis2-j-01
+        title: MFA for remote and privileged access
+        description: Multi-factor authentication is required for remote access, administrator accounts and cloud services.
+        check_type: manual
+        evidence_hint: MFA enforcement settings and coverage report.
+      - id: nis2-j-02
+        title: MFA on firewall administration
+        description: Administrator login to the firewall requires a second factor.
+        check_type: automated
+        automation: opnsense:mfa
+        evidence_hint: Authentication server configuration showing TOTP for admin users.
+      - id: nis2-j-03
+        title: Secured internal communications
+        description: Voice, video and text communications used for business run on encrypted platforms.
+        check_type: manual
+        evidence_hint: List of approved communication tools and their encryption.
+      - id: nis2-j-04
+        title: Emergency communication channel
+        description: A secured backup communication channel exists for use when primary systems are unavailable.
+        check_type: manual
+        evidence_hint: Description of the emergency channel and test record.

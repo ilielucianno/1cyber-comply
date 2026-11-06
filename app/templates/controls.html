@@ -1,0 +1,24 @@
+{% extends "base.html" %}
+{% block title %}Controale {{ framework.name }} · {{ app_name }}{% endblock %}
+{% block content %}
+<p class="muted" style="margin-top:0">{{ framework.name }} {{ framework.version }} — {{ framework.description }}</p>
+
+{% for cat in categories %}
+<h2>{{ cat.reference }} · {{ cat.title }}</h2>
+<div class="card">
+  {% for c in cat.controls %}
+  <div class="row">
+    <div>
+      <div><strong>{{ c.title }}</strong> <code>{{ c.id }}</code></div>
+      <div class="muted" style="font-size:14px">{{ c.description }}</div>
+      {% if c.evidence_hint %}<div style="font-size:13px;margin-top:4px">Dovada: <span class="muted">{{ c.evidence_hint }}</span></div>{% endif %}
+    </div>
+    <div style="text-align:right">
+      <span class="tag {{ c.check_type }}">{{ 'automat' if c.check_type == 'automated' else 'manual' }}</span>
+      {% if c.automation %}<div><code>{{ c.automation }}</code></div>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endfor %}
+{% endblock %}

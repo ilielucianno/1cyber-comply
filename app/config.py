@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_NAME = "1cyber Comply"
-APP_VERSION = "0.1.0"
+APP_VERSION = "0.2.0"
 
 # Baza de date SQLite (un singur fisier, fara server separat)
 DATA_DIR = Path(os.getenv("COMPLY_DATA_DIR", BASE_DIR / "data"))
