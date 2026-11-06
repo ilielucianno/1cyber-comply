@@ -33,6 +33,10 @@ teams already have: **Wazuh** and **OPNsense**.
 | **Built for audits** | Roles (viewer / editor / admin), audit log of every action, evidence history per control |
 | **Read-only by design** | Never changes anything on your systems. Minimal privileges documented below |
 
+**Works with:** Wazuh and OPNsense today; Zenarmor, Microsoft 365 / Entra ID, Microsoft
+Defender, FortiGate, Sophos, CrowdSec and Proxmox are planned. Any other tool can be covered
+with manual evidence. See the full list in [INTEGRATIONS.md](INTEGRATIONS.md).
+
 <table>
 <tr>
 <td><img src="docs/screenshots/controls.png" alt="Controls"></td>
