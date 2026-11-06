@@ -1,0 +1,14 @@
+services:
+  comply:
+    build: .
+    image: 1cyber-comply:latest
+    container_name: 1cyber-comply
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "127.0.0.1:8080:8080"   # doar local; pune un reverse proxy in fata pentru acces din retea
+    volumes:
+      - comply-data:/data
+
+volumes:
+  comply-data:

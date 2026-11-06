@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{ app_name }}</title>
+<style>
+  :root { --bg:#0f1419; --card:#1a2129; --text:#e6e8eb; --muted:#8a939d; --ok:#3fb950; --off:#d29922; --line:#2a333d; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,"Segoe UI",sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:20px 24px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; align-items:baseline; }
+  header h1 { margin:0; font-size:20px; }
+  header span { color:var(--muted); font-size:13px; }
+  main { max-width:960px; margin:0 auto; padding:24px 16px; }
+  .grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(200px,1fr)); gap:16px; margin-bottom:24px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:8px; padding:16px; }
+  .card .num { font-size:32px; font-weight:600; }
+  .card .lbl { color:var(--muted); font-size:13px; }
+  h2 { font-size:15px; color:var(--muted); font-weight:500; text-transform:uppercase; letter-spacing:.05em; }
+  .src { display:flex; justify-content:space-between; padding:10px 0; border-bottom:1px solid var(--line); }
+  .ok { color:var(--ok); } .off { color:var(--off); }
+</style>
+</head>
+<body>
+<header>
+  <h1>{{ app_name }}</h1>
+  <span>v{{ version }} · NIS2 compliance automation</span>
+</header>
+<main>
+  <div class="grid">
+    <div class="card"><div class="num">{{ stats.frameworks }}</div><div class="lbl">Frameworks</div></div>
+    <div class="card"><div class="num">{{ stats.controls }}</div><div class="lbl">Controale</div></div>
+    <div class="card"><div class="num">{{ stats.evidence }}</div><div class="lbl">Dovezi colectate</div></div>
+  </div>
+
+  <h2>Surse de date</h2>
+  <div class="card">
+    {% for name, ok in sources.items() %}
+    <div class="src">
+      <span>{{ name|capitalize }}</span>
+      {% if ok %}<span class="ok">configurat</span>{% else %}<span class="off">neconfigurat (.env)</span>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</main>
+</body>
+</html>
