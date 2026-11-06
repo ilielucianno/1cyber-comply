@@ -16,7 +16,7 @@
 set -euo pipefail
 
 REPO="https://github.com/ilielucianno/1cyber-comply.git"
-VERSION="${COMPLY_VERSION:-main}"
+REF="${COMPLY_VERSION:-main}"
 DIR="${COMPLY_DIR:-/opt/1cyber-comply}"
 
 info()  { printf '\033[1;34m[+]\033[0m %s\n' "$*"; }
@@ -34,13 +34,15 @@ confirm() {
 
 [ "$(id -u)" -eq 0 ] || fail "Run as root, e.g.: curl -fsSL .../get.sh | sudo bash"
 [ -r /etc/os-release ] || fail "Unsupported system: /etc/os-release not found"
-# shellcheck disable=SC1091
-. /etc/os-release
-case "${ID:-}:${ID_LIKE:-}" in
+# Read os-release in a subshell so its variables (VERSION, NAME, ...) cannot clash with ours
+os_id=$(. /etc/os-release; echo "${ID:-}")
+os_like=$(. /etc/os-release; echo "${ID_LIKE:-}")
+os_name=$(. /etc/os-release; echo "${PRETTY_NAME:-unknown}")
+case "$os_id:$os_like" in
   ubuntu:*|debian:*|*:*debian*|*:*ubuntu*) ;;
-  *) fail "Supported: Ubuntu and Debian. Detected: ${PRETTY_NAME:-unknown}" ;;
+  *) fail "Supported: Ubuntu and Debian. Detected: $os_name" ;;
 esac
-info "System: ${PRETTY_NAME}"
+info "System: $os_name"
 
 # --- dependencies -------------------------------------------------------------
 missing=()
@@ -74,13 +76,13 @@ docker compose version >/dev/null 2>&1 || fail "Docker Compose v2 is not working
 
 # --- download / upgrade --------------------------------------------------------
 if [ -d "$DIR/.git" ]; then
-  info "Existing installation found in $DIR: upgrading to '$VERSION'"
-  git -C "$DIR" fetch --quiet --depth 1 origin "$VERSION"
+  info "Existing installation found in $DIR: upgrading to '$REF'"
+  git -C "$DIR" fetch --quiet --depth 1 origin "$REF"
   git -C "$DIR" checkout --quiet --force FETCH_HEAD
 else
   [ -e "$DIR" ] && fail "$DIR exists but is not a 1cyber Comply installation"
-  info "Downloading 1cyber Comply ($VERSION) into $DIR"
-  git clone --quiet --depth 1 --branch "$VERSION" "$REPO" "$DIR"
+  info "Downloading 1cyber Comply ($REF) into $DIR"
+  git clone --quiet --depth 1 --branch "$REF" "$REPO" "$DIR"
 fi
 cd "$DIR"
 
