@@ -172,7 +172,7 @@ def test_collection_saves_evidence_on_controls(wazuh_env):
         assert latest["nis2-b-02"]["status"] == "fail"     # agents_active
         assert latest["nis2-i-01"]["status"] == "pass"     # syscollector
         assert latest["nis2-e-01"]["status"] == "fail"     # vulnerabilities
-        assert "nis2-a-01" not in latest                   # manual control, no evidence
+        assert latest.get("nis2-a-01", {}).get("source") != "wazuh"   # manual control
 
         api = client.get("/api/frameworks/nis2/controls").json()
         assert api["status_counts"]["pass"] >= 2

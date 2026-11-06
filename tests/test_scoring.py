@@ -33,6 +33,7 @@ class StaticCollector(BaseCollector):
 def clean_db():
     with TestClient(app):
         with get_conn() as conn:
+            conn.execute("DELETE FROM attachments")
             conn.execute("DELETE FROM evidence")
             conn.execute("DELETE FROM score_history")
             conn.execute("DELETE FROM collection_runs")

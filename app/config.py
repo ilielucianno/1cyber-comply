@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_NAME = "1cyber Comply"
-APP_VERSION = "0.5.0"
+APP_VERSION = "0.6.0"
 
 # SQLite database (a single file, no separate server)
 DATA_DIR = Path(os.getenv("COMPLY_DATA_DIR", BASE_DIR / "data"))
@@ -44,3 +44,6 @@ OPNSENSE_CHECK_LATEST = os.getenv("OPNSENSE_CHECK_LATEST", "true").lower() == "t
 COLLECT_INTERVAL_HOURS = float(os.getenv("COLLECT_INTERVAL_HOURS", "24"))
 # Delay before the first automatic run after start-up.
 COLLECT_START_DELAY_SECONDS = int(os.getenv("COLLECT_START_DELAY_SECONDS", "60"))
+
+# Organisation name shown on reports
+ORG_NAME = os.getenv("ORG_NAME", "Your organisation")

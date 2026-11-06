@@ -2,7 +2,8 @@
 {% block title %}Controls {{ framework.name }} · {{ app_name }}{% endblock %}
 {% block content %}
 <p class="muted" style="margin-top:0">{{ framework.name }} {{ framework.version }} — {{ framework.description }}</p>
-<p>
+<p style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+  <a class="btn" href="/reports/{{ framework.id }}.pdf">Download PDF report</a>
   <span class="st pass">{{ counts.pass }} pass</span>
   <span class="st fail">{{ counts.fail }} fail</span>
   <span class="st unknown">{{ counts.unknown }} unknown</span>
@@ -15,12 +16,14 @@
   {% set e = latest.get(c.id) %}
   <div class="row">
     <div>
-      <div><strong>{{ c.title }}</strong> <code>{{ c.id }}</code></div>
+      <div><a href="/controls/{{ framework.id }}/{{ c.id }}"><strong>{{ c.title }}</strong></a> <code>{{ c.id }}</code></div>
       <div class="muted" style="font-size:14px">{{ c.description }}</div>
       {% if c.evidence_hint %}<div style="font-size:13px;margin-top:4px">Evidence: <span class="muted">{{ c.evidence_hint }}</span></div>{% endif %}
       {% if e %}
       <div class="evidence"><span class="st {{ e.status }}">{{ e.status }}</span> {{ e.summary }}
-        <span class="muted">· {{ e.source }} · {{ e.collected_at }} UTC</span></div>
+        <span class="muted">· {{ e.source }} · {{ e.collected_at }} UTC{% if e.reviewer %} · {{ e.reviewer }}{% endif %}{% if e.valid_until and not e.expired %} · valid until {{ e.valid_until }}{% endif %}{% if e.attachment_count %} · {{ e.attachment_count }} file(s){% endif %}</span></div>
+      {% elif c.check_type == 'manual' %}
+      <div class="evidence muted">No evidence yet · <a href="/controls/{{ framework.id }}/{{ c.id }}">add evidence</a></div>
       {% endif %}
     </div>
     <div style="text-align:right">

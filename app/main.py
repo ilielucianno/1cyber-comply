@@ -4,11 +4,13 @@ from contextlib import asynccontextmanager
 
 from urllib.parse import quote
 
-from fastapi import FastAPI, HTTPException, Request
-from fastapi.responses import HTMLResponse, RedirectResponse
+from datetime import date, timedelta
+
+from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, evidence, scoring
+from app import catalog, config, evidence, manual, report, scoring
 from app.scheduler import run_all, scheduler
 from app.db import get_conn, init_db
 
@@ -182,3 +184,63 @@ def controls_page(request: Request, framework_id: str = "nis2"):
         "latest": evidence.latest_by_control(framework_id),
         "counts": evidence.status_counts(framework_id),
     })
+
+
+def _control(framework_id: str, control_id: str) -> dict:
+    with get_conn() as conn:
+        row = conn.execute("SELECT * FROM controls WHERE id = ? AND framework_id = ?",
+                           (control_id, framework_id)).fetchone()
+    if not row:
+        raise HTTPException(status_code=404, detail=f"Control '{control_id}' does not exist")
+    return dict(row)
+
+
+@app.get("/controls/{framework_id}/{control_id}", response_class=HTMLResponse)
+def control_page(request: Request, framework_id: str, control_id: str, msg: str | None = None, ok: int = 1):
+    fw = _framework(framework_id)
+    return templates.TemplateResponse(request, "control.html", {
+        "app_name": config.APP_NAME, "version": config.APP_VERSION, "page": "controls",
+        "framework": fw, "control": _control(framework_id, control_id),
+        "history": evidence.history_for_control(control_id),
+        "default_valid_until": (date.today() + timedelta(days=365)).isoformat(),
+        "today": date.today().isoformat(), "allowed": ", ".join(sorted(manual.ALLOWED_EXTENSIONS)),
+        "flash": msg, "flash_ok": bool(ok),
+    })
+
+
+@app.post("/controls/{framework_id}/{control_id}/evidence")
+async def add_evidence(framework_id: str, control_id: str,
+                       status: str = Form(...), note: str = Form(""), reviewer: str = Form(""),
+                       valid_until: str = Form(""), file: UploadFile | None = File(None)):
+    _control(framework_id, control_id)
+    upload = None
+    if file is not None and file.filename:
+        data = await file.read(manual.MAX_FILE_BYTES + 1)
+        upload = manual.Upload(file.filename, data)
+    base = f"/controls/{framework_id}/{control_id}"
+    try:
+        manual.add_manual_evidence(control_id, status, note, reviewer, valid_until or None, upload)
+    except manual.EvidenceError as exc:
+        return RedirectResponse(f"{base}?ok=0&msg={quote(str(exc))}", status_code=303)
+    scoring.snapshot_all()
+    return RedirectResponse(f"{base}?ok=1&msg={quote('Evidence saved.')}", status_code=303)
+
+
+@app.get("/attachments/{attachment_id}")
+def download_attachment(attachment_id: int):
+    found = manual.get_attachment(attachment_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Attachment not found")
+    meta, path = found
+    # Always a download, never rendered inline: uploaded files cannot run in the app's origin.
+    return FileResponse(path, media_type="application/octet-stream", filename=meta["filename"],
+                        headers={"X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/reports/{framework_id}.pdf")
+def pdf_report(framework_id: str):
+    fw = _framework(framework_id)
+    pdf = report.build_pdf(fw)
+    name = f"{framework_id}-compliance-report-{date.today().isoformat()}.pdf"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})

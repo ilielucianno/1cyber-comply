@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block title %}{{ control.id }} · {{ app_name }}{% endblock %}
+{% block content %}
+{% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
+
+<p style="margin-top:0"><a href="/controls/{{ framework.id }}">&larr; {{ framework.name }} controls</a></p>
+<h1 style="font-size:22px;margin:0 0 4px">{{ control.title }}</h1>
+<p class="muted" style="margin:0 0 16px"><code>{{ control.id }}</code> · {{ control.reference }} · {{ control.category_title }}
+  · <span class="tag {{ control.check_type }}">{{ control.check_type }}</span></p>
+
+<div class="card">
+  <div>{{ control.description }}</div>
+  {% if control.evidence_hint %}<div style="margin-top:8px;font-size:14px">Expected evidence: <span class="muted">{{ control.evidence_hint }}</span></div>{% endif %}
+</div>
+
+{% if control.check_type == 'manual' %}
+<h2>Add evidence</h2>
+<div class="card">
+  <form method="post" action="/controls/{{ framework.id }}/{{ control.id }}/evidence" enctype="multipart/form-data" class="form">
+    <label>Assessment
+      <select name="status" required>
+        <option value="pass">Pass: the evidence shows the control is in place</option>
+        <option value="fail">Fail: the control is missing or insufficient</option>
+      </select>
+    </label>
+    <label>Note <span class="muted">(what the evidence is and what it shows)</span>
+      <textarea name="note" rows="3" required></textarea>
+    </label>
+    <div class="cols">
+      <label>Reviewer name <input name="reviewer" required></label>
+      <label>Valid until <input type="date" name="valid_until" value="{{ default_valid_until }}" min="{{ today }}"></label>
+    </div>
+    <label>File <span class="muted">(optional, max 10 MB: {{ allowed }})</span>
+      <input type="file" name="file">
+    </label>
+    <div><button type="submit">Save evidence</button></div>
+  </form>
+</div>
+{% endif %}
+
+<h2>Evidence history</h2>
+<div class="card">
+  {% for e in history %}
+  <div class="row">
+    <div>
+      <div><span class="st {{ e.status }}">{{ e.status }}</span> {{ e.summary }}</div>
+      <div class="muted" style="font-size:13px;margin-top:4px">
+        {{ e.collected_at }} UTC · {{ e.source }}{% if e.reviewer %} · reviewed by {{ e.reviewer }}{% endif %}
+        {% if e.valid_until %} · valid until {{ e.valid_until }}{% endif %}
+      </div>
+      {% for a in e.attachments %}
+      <div style="font-size:13px;margin-top:4px">
+        <a href="/attachments/{{ a.id }}">{{ a.filename }}</a>
+        <span class="muted">· {{ (a.size / 1024)|round(1) }} KB · sha256 {{ a.sha256[:16] }}…</span>
+      </div>
+      {% endfor %}
+    </div>
+    <div>{% if loop.first %}<span class="muted" style="font-size:12px">current</span>{% endif %}</div>
+  </div>
+  {% else %}
+  <div class="row muted">No evidence yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

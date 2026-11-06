@@ -33,7 +33,9 @@ CREATE TABLE IF NOT EXISTS evidence (
     status       TEXT NOT NULL,            -- pass | fail | unknown
     summary      TEXT,
     raw_json     TEXT,                     -- raw collected data
-    collected_at TEXT NOT NULL DEFAULT (datetime('now'))
+    collected_at TEXT NOT NULL DEFAULT (datetime('now')),
+    reviewer     TEXT,                     -- manual evidence: who assessed it
+    valid_until  TEXT                      -- manual evidence: YYYY-MM-DD, expired = not compliant
 );
 
 CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence(control_id);
@@ -60,6 +62,17 @@ CREATE TABLE IF NOT EXISTS score_history (
     total        INTEGER NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS attachments (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    evidence_id  INTEGER NOT NULL REFERENCES evidence(id),
+    filename     TEXT NOT NULL,            -- sanitised original name
+    stored_name  TEXT NOT NULL UNIQUE,     -- random name on disk
+    content_type TEXT,
+    size         INTEGER NOT NULL,
+    sha256       TEXT NOT NULL,
+    uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
 CREATE INDEX IF NOT EXISTS idx_score_fw ON score_history(framework_id, taken_at);
 """
 
@@ -72,6 +85,10 @@ MIGRATIONS = {
         "automation": "TEXT",
         "evidence_hint": "TEXT",
         "sort_order": "INTEGER DEFAULT 0",
+    },
+    "evidence": {
+        "reviewer": "TEXT",
+        "valid_until": "TEXT",
     },
 }
 

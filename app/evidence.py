@@ -1,6 +1,7 @@
 """Runs collectors and stores their results as evidence attached to controls."""
 import json
 import logging
+from datetime import date
 
 from app.collectors.base import BaseCollector, CheckResult
 from app.db import get_conn
@@ -69,13 +70,42 @@ def last_runs() -> dict[str, dict]:
     return {r["source"]: dict(r) for r in rows}
 
 
+def effective(e: dict, today: str | None = None) -> dict:
+    """Expired manual evidence no longer proves compliance: it counts as fail."""
+    today = today or date.today().isoformat()
+    e = dict(e)
+    e["expired"] = bool(e.get("valid_until") and e["valid_until"] < today)
+    if e["expired"]:
+        e["status"] = "fail"
+        e["summary"] = f"EXPIRED on {e['valid_until']}. {e.get('summary') or ''}".strip()
+    return e
+
+
 def latest_by_control(framework_id: str) -> dict[str, dict]:
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT e.* FROM evidence e JOIN controls c ON c.id = e.control_id
+            """SELECT e.*, (SELECT COUNT(*) FROM attachments a WHERE a.evidence_id = e.id) AS attachment_count
+               FROM evidence e JOIN controls c ON c.id = e.control_id
                WHERE c.framework_id = ? AND e.id IN
                  (SELECT MAX(id) FROM evidence GROUP BY control_id)""", (framework_id,)).fetchall()
-    return {r["control_id"]: dict(r) for r in rows}
+    return {r["control_id"]: effective(dict(r)) for r in rows}
+
+
+def history_for_control(control_id: str) -> list[dict]:
+    with get_conn() as conn:
+        rows = conn.execute("SELECT * FROM evidence WHERE control_id = ? ORDER BY id DESC", (control_id,)).fetchall()
+        atts = conn.execute(
+            """SELECT a.* FROM attachments a JOIN evidence e ON e.id = a.evidence_id
+               WHERE e.control_id = ? ORDER BY a.id""", (control_id,)).fetchall()
+    by_ev: dict[int, list] = {}
+    for a in atts:
+        by_ev.setdefault(a["evidence_id"], []).append(dict(a))
+    out = []
+    for r in rows:
+        e = effective(dict(r))
+        e["attachments"] = by_ev.get(r["id"], [])
+        out.append(e)
+    return out
 
 
 def status_counts(framework_id: str) -> dict[str, int]:

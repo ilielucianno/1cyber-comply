@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.5.0) — stage 3, automatic collection and compliance score.
+**Status:** early development (v0.6.0) — stage 4, manual evidence and PDF reports.
 
 ## Why
 
@@ -20,8 +20,8 @@ for free, using tools many teams already run.
 | 2a | Wazuh collector (Server API + Indexer): 7 automated checks | done |
 | 2b | OPNsense collector: 6 automated checks | done |
 | 3 | Scheduled collection, compliance score and history | done |
-| 4 | Manual evidence upload, PDF reports | next |
-| 5 | Login, user accounts, HTTPS — required before exposing the app on a network | planned |
+| 4 | Manual evidence upload, PDF reports | done |
+| 5 | Login, user accounts, HTTPS — required before exposing the app on a network | next |
 | 6 | One-line installer, .deb package | planned |
 
 ## Quick start (Docker)
@@ -52,6 +52,21 @@ and a history chart; a snapshot is stored after every collection.
 
 Collection runs automatically every `COLLECT_INTERVAL_HOURS` (default 24, `0` disables it).
 The internal check `nis2-f-03` passes only while automatic collection keeps running.
+
+## Manual evidence and reports
+
+Open any manual control and add evidence: a pass/fail assessment, a note, the reviewer's
+name, a validity date (default one year) and optionally a file (PDF, images, Office/ODF
+documents, text; max 10 MB). Expired evidence automatically counts as failed, so annual
+reviews cannot be silently skipped. Every piece of evidence is kept as an audit trail.
+
+Uploaded files are stored under random names and only ever served as downloads, never
+rendered in the browser. Their SHA-256 hash is listed in the report.
+
+**PDF report:** *Download PDF report* on the dashboard or controls page. It contains the
+score and history, findings to address, every control with its current evidence, an
+appendix of evidence files with hashes, and a statement that it supports but does not
+replace an assessment by the authority or an accredited auditor. Set `ORG_NAME` in `.env`.
 
 ## Connecting Wazuh
 

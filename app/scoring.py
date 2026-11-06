@@ -10,10 +10,8 @@ def compute(framework_id: str) -> dict:
     with get_conn() as conn:
         controls = conn.execute(
             "SELECT id, check_type FROM controls WHERE framework_id = ?", (framework_id,)).fetchall()
-        latest = {r["control_id"]: r["status"] for r in conn.execute(
-            """SELECT e.control_id, e.status FROM evidence e JOIN controls c ON c.id = e.control_id
-               WHERE c.framework_id = ? AND e.id IN (SELECT MAX(id) FROM evidence GROUP BY control_id)""",
-            (framework_id,))}
+    from app import evidence
+    latest = {cid: e["status"] for cid, e in evidence.latest_by_control(framework_id).items()}
 
     total = len(controls)
     automated = [c["id"] for c in controls if c["check_type"] == "automated"]

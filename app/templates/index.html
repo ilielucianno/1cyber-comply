@@ -13,9 +13,10 @@
     <div class="sub">
       <div>{{ fw.score.passed }} of {{ fw.score.total }} controls proven (pass)</div>
       <div>Automated controls: {{ fw.score.automated_score|round|int }}% ({{ fw.score.automated_total }} controls)</div>
-      <div>Manual controls: {{ fw.score.manual_score|round|int }}% ({{ fw.score.manual_total }} controls, evidence upload in stage 4)</div>
+      <div>Manual controls: {{ fw.score.manual_score|round|int }}% ({{ fw.score.manual_total }} controls, <a href="/controls/{{ fw.id }}">add evidence</a>)</div>
       <div>{{ fw.score.failed }} fail · {{ fw.score.unknown }} unknown · {{ fw.score.missing }} without evidence</div>
     </div>
+    <div style="margin-left:auto"><a class="btn" href="/reports/{{ fw.id }}.pdf">Download PDF report</a></div>
   </div>
   {% if fw.chart %}
   <div style="margin-top:16px">{{ fw.chart|safe }}</div>
