@@ -4,10 +4,10 @@
 
 <div class="grid">
   <div class="card"><div class="num">{{ stats.frameworks }}</div><div class="lbl">Frameworks</div></div>
-  <div class="card"><div class="num">{{ stats.controls }}</div><div class="lbl">Controale</div></div>
-  <div class="card"><div class="num">{{ stats.automated }}</div><div class="lbl">Verificate automat</div></div>
-  <div class="card"><div class="num">{{ stats.manual }}</div><div class="lbl">Dovezi manuale</div></div>
-  <div class="card"><div class="num">{{ stats.evidence }}</div><div class="lbl">Dovezi colectate</div></div>
+  <div class="card"><div class="num">{{ stats.controls }}</div><div class="lbl">Controls</div></div>
+  <div class="card"><div class="num">{{ stats.automated }}</div><div class="lbl">Automated</div></div>
+  <div class="card"><div class="num">{{ stats.manual }}</div><div class="lbl">Manual evidence</div></div>
+  <div class="card"><div class="num">{{ stats.evidence }}</div><div class="lbl">Evidence collected</div></div>
 </div>
 
 <h2>Frameworks</h2>
@@ -19,32 +19,32 @@
       <span class="st pass">{{ fw.status_counts.pass }} pass</span>
       <span class="st fail">{{ fw.status_counts.fail }} fail</span>
       <span class="st unknown">{{ fw.status_counts.unknown }} unknown</span>
-      <span class="muted">· {{ fw.control_count }} controale</span>
+      <span class="muted">· {{ fw.control_count }} controls</span>
     </span>
   </div>
   {% else %}
-  <div class="row muted">Niciun framework incarcat.</div>
+  <div class="row muted">No frameworks loaded.</div>
   {% endfor %}
 </div>
 
-<h2>Surse de date</h2>
+<h2>Data sources</h2>
 <div class="card">
   {% for name, ok in sources.items() %}
   <div class="row">
     <div>
       <div>{{ name|capitalize }}
-        {% if ok %}<span class="ok">configurat</span>{% else %}<span class="off">neconfigurat (.env)</span>{% endif %}
+        {% if ok %}<span class="ok">configured</span>{% else %}<span class="off">not configured (.env)</span>{% endif %}
       </div>
       {% if runs.get(name) %}
-      <div class="muted" style="font-size:13px">Ultima colectare: {{ runs[name].finished_at or runs[name].started_at }} UTC — {{ runs[name].message }}</div>
+      <div class="muted" style="font-size:13px">Last collection: {{ runs[name].finished_at or runs[name].started_at }} UTC — {{ runs[name].message }}</div>
       {% endif %}
     </div>
     <div>
       {% if ok and name in collectors %}
-      <form method="post" action="/sources/{{ name }}/test"><button>Testeaza conexiunea</button></form>
-      <form method="post" action="/sources/{{ name }}/collect"><button>Colecteaza acum</button></form>
+      <form method="post" action="/sources/{{ name }}/test"><button>Test connection</button></form>
+      <form method="post" action="/sources/{{ name }}/collect"><button>Collect now</button></form>
       {% elif name not in collectors %}
-      <span class="muted" style="font-size:13px">colector in lucru</span>
+      <span class="muted" style="font-size:13px">collector in progress</span>
       {% endif %}
     </div>
   </div>

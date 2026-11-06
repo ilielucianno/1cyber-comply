@@ -1,7 +1,7 @@
-"""Incarca cataloagele de controale din controls/*.yaml in baza de date.
+"""Loads control catalogues from controls/*.yaml into the database.
 
-Ruleaza la fiecare pornire: YAML-ul este sursa de adevar pentru controale.
-Dovezile deja colectate raman neatinse.
+Runs at every start: the YAML files are the source of truth for controls.
+Evidence already collected is never touched.
 """
 import logging
 from pathlib import Path
@@ -21,28 +21,28 @@ class CatalogError(ValueError):
 
 
 def validate(data: dict, source: str) -> None:
-    """Opreste incarcarea daca fisierul YAML are greseli, cu mesaj clar."""
+    """Stop loading with a clear message if the YAML file has mistakes."""
     fw = data.get("framework") or {}
     for key in ("id", "name"):
         if not fw.get(key):
-            raise CatalogError(f"{source}: framework.{key} lipseste")
+            raise CatalogError(f"{source}: framework.{key} is missing")
     seen: set[str] = set()
     for cat in data.get("categories") or []:
         for key in ("id", "reference", "title"):
             if not cat.get(key):
-                raise CatalogError(f"{source}: categoria {cat} nu are '{key}'")
+                raise CatalogError(f"{source}: category {cat} has no '{key}'")
         for ctl in cat.get("controls") or []:
             cid = ctl.get("id")
             if not cid or not ctl.get("title"):
-                raise CatalogError(f"{source}: control fara id sau title in categoria {cat['id']}")
+                raise CatalogError(f"{source}: control without id or title in category {cat['id']}")
             if cid in seen:
-                raise CatalogError(f"{source}: id duplicat {cid}")
+                raise CatalogError(f"{source}: duplicate id {cid}")
             seen.add(cid)
             ctype = ctl.get("check_type", "manual")
             if ctype not in VALID_CHECK_TYPES:
-                raise CatalogError(f"{source}: {cid} are check_type invalid '{ctype}'")
+                raise CatalogError(f"{source}: {cid} has invalid check_type '{ctype}'")
             if ctype == "automated" and not ctl.get("automation"):
-                raise CatalogError(f"{source}: {cid} este automated dar nu are 'automation'")
+                raise CatalogError(f"{source}: {cid} is automated but has no 'automation'")
 
 
 def load_file(path: Path) -> tuple[str, int]:
@@ -82,7 +82,7 @@ def load_file(path: Path) -> tuple[str, int]:
                  evidence_hint=excluded.evidence_hint, sort_order=excluded.sort_order""",
             rows,
         )
-        # Controale scoase din YAML: le stergem doar daca nu au dovezi atasate
+        # Controls removed from the YAML are deleted only if they have no evidence
         ids = [r[0] for r in rows]
         placeholders = ",".join("?" * len(ids)) or "''"
         conn.execute(
@@ -98,12 +98,12 @@ def load_all(directory: Path = CONTROLS_DIR) -> dict[str, int]:
     for path in sorted(directory.glob("*.yaml")):
         fw_id, count = load_file(path)
         loaded[fw_id] = count
-        log.info("Catalog %s: %d controale incarcate din %s", fw_id, count, path.name)
+        log.info("Catalogue %s: %d controls loaded from %s", fw_id, count, path.name)
     return loaded
 
 
 def controls_by_category(framework_id: str) -> list[dict]:
-    """Controalele unui framework, grupate pe categorii, pentru UI si API."""
+    """A framework's controls grouped by category, for the UI and API."""
     with get_conn() as conn:
         rows = conn.execute(
             """SELECT * FROM controls WHERE framework_id = ? ORDER BY sort_order""",

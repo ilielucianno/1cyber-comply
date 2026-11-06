@@ -1,4 +1,4 @@
-"""Baza de date: SQLite din biblioteca standard Python, fara dependinte extra."""
+"""Database: SQLite from the Python standard library, no extra dependencies."""
 import sqlite3
 from contextlib import contextmanager
 
@@ -6,22 +6,22 @@ from app.config import DATA_DIR, DB_PATH
 
 SCHEMA = """
 CREATE TABLE IF NOT EXISTS frameworks (
-    id          TEXT PRIMARY KEY,          -- ex: nis2
+    id          TEXT PRIMARY KEY,          -- e.g. nis2
     name        TEXT NOT NULL,
     version     TEXT,
     description TEXT
 );
 
 CREATE TABLE IF NOT EXISTS controls (
-    id           TEXT PRIMARY KEY,         -- ex: nis2-21.2.a-01
+    id           TEXT PRIMARY KEY,         -- e.g. nis2-a-01
     framework_id TEXT NOT NULL REFERENCES frameworks(id),
-    reference    TEXT NOT NULL,            -- ex: Art. 21(2)(a)
+    reference    TEXT NOT NULL,            -- e.g. Art. 21(2)(a)
     title        TEXT NOT NULL,
     description  TEXT,
     check_type   TEXT NOT NULL DEFAULT 'manual',  -- automated | manual
-    category_id    TEXT,                   -- ex: a
+    category_id    TEXT,                   -- e.g. a
     category_title TEXT,
-    automation     TEXT,                   -- ex: wazuh:sca
+    automation     TEXT,                   -- e.g. wazuh:sca
     evidence_hint  TEXT,
     sort_order     INTEGER DEFAULT 0
 );
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS evidence (
     source       TEXT NOT NULL,            -- wazuh | opnsense | manual
     status       TEXT NOT NULL,            -- pass | fail | unknown
     summary      TEXT,
-    raw_json     TEXT,                     -- datele brute colectate
+    raw_json     TEXT,                     -- raw collected data
     collected_at TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -49,7 +49,7 @@ CREATE TABLE IF NOT EXISTS collection_runs (
 """
 
 
-# Coloane adaugate dupa v0.1.0. Bazele de date existente le primesc prin ALTER TABLE.
+# Columns added after v0.1.0. Existing databases receive them via ALTER TABLE.
 MIGRATIONS = {
     "controls": {
         "category_id": "TEXT",

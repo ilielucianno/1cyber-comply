@@ -1,4 +1,4 @@
-"""Ruleaza colectorii si salveaza rezultatele ca dovezi atasate controalelor."""
+"""Runs collectors and stores their results as evidence attached to controls."""
 import json
 import logging
 
@@ -14,14 +14,14 @@ def get_collectors() -> dict[str, BaseCollector]:
 
 
 def save_results(source: str, results: list[CheckResult]) -> int:
-    """Leaga fiecare rezultat de controalele cu automation = '<source>:<check>'."""
+    """Attach each result to the controls with automation = '<source>:<check>'."""
     saved = 0
     with get_conn() as conn:
         for r in results:
             control_ids = [row["id"] for row in conn.execute(
                 "SELECT id FROM controls WHERE automation = ?", (f"{source}:{r.check}",))]
             if not control_ids:
-                log.info("Verificarea %s:%s nu e legata de niciun control", source, r.check)
+                log.info("Check %s:%s is not linked to any control", source, r.check)
             for cid in control_ids:
                 conn.execute(
                     "INSERT INTO evidence (control_id, source, status, summary, raw_json) VALUES (?, ?, ?, ?, ?)",
@@ -34,7 +34,7 @@ def save_results(source: str, results: list[CheckResult]) -> int:
 def run_collection(source: str, collector: BaseCollector | None = None) -> dict:
     collector = collector or get_collectors()[source]
     if not collector.is_configured():
-        return {"ok": False, "message": f"{source} nu este configurat in .env", "saved": 0}
+        return {"ok": False, "message": f"{source} is not configured in .env", "saved": 0}
 
     with get_conn() as conn:
         run_id = conn.execute("INSERT INTO collection_runs (source) VALUES (?)", (source,)).lastrowid
@@ -44,11 +44,11 @@ def run_collection(source: str, collector: BaseCollector | None = None) -> dict:
         saved = save_results(source, results)
         counts = {s: sum(1 for r in results if r.status == s) for s in ("pass", "fail", "unknown")}
         ok = True
-        message = (f"{len(results)} verificari: {counts['pass']} pass, {counts['fail']} fail, "
-                   f"{counts['unknown']} unknown; {saved} dovezi salvate")
+        message = (f"{len(results)} checks: {counts['pass']} pass, {counts['fail']} fail, "
+                   f"{counts['unknown']} unknown; {saved} evidence records saved")
     except Exception as exc:  # noqa: BLE001
-        ok, saved, message = False, 0, f"Colectarea a esuat: {exc}"
-        log.exception("Colectarea %s a esuat", source)
+        ok, saved, message = False, 0, f"Collection failed: {exc}"
+        log.exception("Collection %s failed", source)
 
     with get_conn() as conn:
         conn.execute("UPDATE collection_runs SET finished_at = datetime('now'), ok = ?, message = ? WHERE id = ?",

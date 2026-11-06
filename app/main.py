@@ -1,4 +1,4 @@
-"""Punctul de intrare al aplicatiei 1cyber Comply."""
+"""1cyber Comply application entry point."""
 import logging
 from contextlib import asynccontextmanager
 
@@ -17,8 +17,8 @@ templates = Jinja2Templates(directory=str(config.BASE_DIR / "app" / "templates")
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
-    init_db()            # creeaza / actualizeaza tabelele
-    catalog.load_all()   # incarca controalele din controls/*.yaml
+    init_db()            # create / migrate tables
+    catalog.load_all()   # load controls from controls/*.yaml
     yield
 
 
@@ -47,7 +47,7 @@ def _sources() -> dict:
 def _collector(source: str):
     collectors = evidence.get_collectors()
     if source not in collectors:
-        raise HTTPException(status_code=404, detail=f"Sursa '{source}' nu are colector inca")
+        raise HTTPException(status_code=404, detail=f"Source '{source}' has no collector yet")
     return collectors[source]
 
 
@@ -64,7 +64,7 @@ def _framework(framework_id: str) -> dict:
     with get_conn() as conn:
         row = conn.execute("SELECT * FROM frameworks WHERE id = ?", (framework_id,)).fetchone()
     if not row:
-        raise HTTPException(status_code=404, detail=f"Framework '{framework_id}' nu exista")
+        raise HTTPException(status_code=404, detail=f"Framework '{framework_id}' does not exist")
     return dict(row)
 
 
@@ -72,7 +72,7 @@ def _framework(framework_id: str) -> dict:
 
 @app.get("/health")
 def health():
-    """Folosit de Docker healthcheck si de monitorizare."""
+    """Used by the Docker healthcheck and monitoring."""
     return {"status": "ok", "version": config.APP_VERSION}
 
 
@@ -111,7 +111,7 @@ def api_collect(source: str):
     return evidence.run_collection(source, _collector(source))
 
 
-# Formulare din UI: ruleaza actiunea si revin pe dashboard cu mesajul rezultatului
+# UI forms: run the action, then return to the dashboard with the result message
 
 @app.post("/sources/{source}/test")
 def ui_test_source(source: str):

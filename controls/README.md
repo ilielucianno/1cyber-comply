@@ -1,8 +1,9 @@
-# Cataloage de controale
+# Control catalogues
 
-Aici vin fisierele YAML cu controalele fiecarui framework (etapa 1).
+One YAML file per framework. Loaded into the database at every start.
 
-- `nis2.yaml` — 41 controale, Directiva (UE) 2022/2555, Art. 21 (masuri de gestionare a riscurilor)
+- `nis2.yaml` — 41 controls, Directive (EU) 2022/2555, Article 21 (risk-management measures) and Article 23 (reporting)
 
-Textul directivelor UE poate fi reutilizat liber (Decizia Comisiei 2011/833/UE).
-Standardele ISO sunt protejate: pentru ISO 27001 scriem doar descrieri proprii, nu textul standardului.
+EU legal texts may be reused freely (Commission Decision 2011/833/EU).
+ISO standards are copyrighted: for ISO 27001 we only reference control numbers and write our own descriptions,
+never the text of the standard.

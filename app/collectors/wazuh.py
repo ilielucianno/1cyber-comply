@@ -1,10 +1,10 @@
-"""Colector Wazuh: Server API (port 55000) + Indexer (port 9200, optional).
+"""Wazuh collector: Server API (port 55000) + Indexer (port 9200, optional).
 
-Server API  -> agenti, versiuni, SCA, FIM, inventar (syscollector)
-Indexer     -> alerte si vulnerabilitati (din Wazuh 4.8 nu mai sunt in Server API)
+Server API  -> agents, versions, SCA, FIM, inventory (syscollector)
+Indexer     -> alerts and vulnerabilities (moved out of the Server API in Wazuh 4.8)
 
-Necesita doar drepturi de citire: user API cu rolul 'readonly' si,
-pentru Indexer, un user cu acces read-only la indecsii wazuh-*.
+Read-only access is enough: an API user with the 'readonly' role and,
+for the Indexer, a user with read-only access to the wazuh-* indices.
 """
 from __future__ import annotations
 
@@ -29,7 +29,7 @@ class WazuhError(RuntimeError):
 # ---------------------------------------------------------------- clients
 
 class WazuhAPI:
-    """Client minimal pentru Wazuh Server API, cu reautentificare automata."""
+    """Minimal Wazuh Server API client with automatic re-authentication."""
 
     def __init__(self, url: str, user: str, password: str, verify: bool = False,
                  transport: httpx.BaseTransport | None = None):
@@ -41,7 +41,7 @@ class WazuhAPI:
     def _authenticate(self) -> None:
         r = self._http.post("/security/user/authenticate", auth=(self._user, self._password))
         if r.status_code == 401:
-            raise WazuhError("Autentificare esuata: verifica WAZUH_USER / WAZUH_PASSWORD")
+            raise WazuhError("Authentication failed: check WAZUH_USER / WAZUH_PASSWORD")
         r.raise_for_status()
         self._token = r.json()["data"]["token"]
 
@@ -50,17 +50,17 @@ class WazuhAPI:
             self._authenticate()
         for attempt in (1, 2):
             r = self._http.get(path, params=params, headers={"Authorization": f"Bearer {self._token}"})
-            if r.status_code == 401 and attempt == 1:   # token expirat (15 min implicit)
+            if r.status_code == 401 and attempt == 1:   # token expired (15 min by default)
                 self._authenticate()
                 continue
             if r.status_code == 403:
-                raise WazuhError(f"Acces refuzat la {path}: userul nu are drepturi de citire")
+                raise WazuhError(f"Access denied to {path}: the user lacks read permissions")
             r.raise_for_status()
             return r.json()["data"]
-        raise WazuhError(f"Nu am putut accesa {path}")
+        raise WazuhError(f"Could not access {path}")
 
     def items(self, path: str, params: dict | None = None) -> list[dict]:
-        """Toate rezultatele unui endpoint, cu paginare."""
+        """All results of an endpoint, following pagination."""
         params = dict(params or {})
         out: list[dict] = []
         offset = 0
@@ -77,7 +77,7 @@ class WazuhAPI:
 
 
 class WazuhIndexer:
-    """Client minimal pentru Wazuh Indexer (OpenSearch), doar cautari."""
+    """Minimal Wazuh Indexer (OpenSearch) client, search only."""
 
     def __init__(self, url: str, user: str, password: str, verify: bool = False,
                  transport: httpx.BaseTransport | None = None):
@@ -85,19 +85,19 @@ class WazuhIndexer:
                                   auth=(user, password), transport=transport)
 
     def search(self, index: str, body: dict) -> dict | None:
-        """Returneaza raspunsul sau None daca indexul nu exista."""
+        """Return the response, or None if the index does not exist."""
         r = self._http.post(f"/{index}/_search", json=body)
         if r.status_code == 404:
             return None
         if r.status_code in (401, 403):
-            raise WazuhError("Indexer: acces refuzat, verifica WAZUH_INDEXER_USER / PASSWORD")
+            raise WazuhError("Indexer: access denied, check WAZUH_INDEXER_USER / PASSWORD")
         r.raise_for_status()
         return r.json()
 
     def ping(self) -> None:
         r = self._http.get("/")
         if r.status_code in (401, 403):
-            raise WazuhError("Indexer: autentificare esuata")
+            raise WazuhError("Indexer: authentication failed")
         r.raise_for_status()
 
     def close(self) -> None:
@@ -117,14 +117,14 @@ def _parse_time(value: str | None) -> datetime | None:
 
 
 def _version_tuple(value: str | None) -> tuple[int, ...]:
-    """'Wazuh v4.14.8' sau 'v4.14.8' -> (4, 14, 8)."""
+    """'Wazuh v4.14.8' or 'v4.14.8' -> (4, 14, 8)."""
     if not value:
         return ()
     v = value.split()[-1].lstrip("v")
     parts = []
     for p in v.split("."):
         num = ""
-        for ch in p:              # doar cifrele de la inceput: "0-rc1" -> 0
+        for ch in p:              # leading digits only: "0-rc1" -> 0
             if not ch.isdigit():
                 break
             num += ch
@@ -146,7 +146,7 @@ class WazuhCollector(BaseCollector):
         self._indexer_transport = indexer_transport
         self._now = now
 
-    # -- configurare
+    # -- configuration
 
     def is_configured(self) -> bool:
         return bool(config.WAZUH_URL and config.WAZUH_USER and config.WAZUH_PASSWORD)
@@ -167,11 +167,11 @@ class WazuhCollector(BaseCollector):
     def _utcnow(self) -> datetime:
         return self._now or datetime.now(timezone.utc)
 
-    # -- test conexiune
+    # -- connection test
 
     def test_connection(self) -> tuple[bool, str]:
         if not self.is_configured():
-            return False, "Wazuh nu este configurat in .env"
+            return False, "Wazuh is not configured in .env"
         messages = []
         ok = True
         api = self._api()
@@ -180,7 +180,7 @@ class WazuhCollector(BaseCollector):
             messages.append(f"API OK, manager {info.get('version', '?')}")
         except Exception as exc:  # noqa: BLE001
             ok = False
-            messages.append(f"API eroare: {exc}")
+            messages.append(f"API error: {exc}")
         finally:
             api.close()
         if self.indexer_configured():
@@ -190,14 +190,14 @@ class WazuhCollector(BaseCollector):
                 messages.append("Indexer OK")
             except Exception as exc:  # noqa: BLE001
                 ok = False
-                messages.append(f"Indexer eroare: {exc}")
+                messages.append(f"Indexer error: {exc}")
             finally:
                 idx.close()
         else:
-            messages.append("Indexer neconfigurat (alerte si vulnerabilitati vor fi 'unknown')")
+            messages.append("Indexer not configured (alerts and vulnerabilities will be 'unknown')")
         return ok, "; ".join(messages)
 
-    # -- colectare
+    # -- collection
 
     def collect(self) -> list[CheckResult]:
         results: list[CheckResult] = []
@@ -209,8 +209,8 @@ class WazuhCollector(BaseCollector):
                     "/agents", {"select": "id,name,status,version,lastKeepAlive,os.name"})
                     if a.get("id") != MANAGER_ID]
             except Exception as exc:  # noqa: BLE001
-                # Fara lista de agenti nu putem rula nimic din API
-                msg = f"Nu am putut citi agentii din Wazuh API: {exc}"
+                # Without the agent list no API check can run
+                msg = f"Could not read agents from the Wazuh API: {exc}"
                 log.warning(msg)
                 for check in ("agents_active", "agents_version", "sca", "fim", "syscollector"):
                     results.append(CheckResult(check, UNKNOWN, msg))
@@ -233,7 +233,7 @@ class WazuhCollector(BaseCollector):
             finally:
                 idx.close()
         else:
-            note = "Wazuh Indexer neconfigurat in .env (WAZUH_INDEXER_*)"
+            note = "Wazuh Indexer not configured in .env (WAZUH_INDEXER_*)"
             results.append(CheckResult("alerts_recent", UNKNOWN, note))
             results.append(CheckResult("vulnerabilities", UNKNOWN, note))
         return results
@@ -244,14 +244,14 @@ class WazuhCollector(BaseCollector):
         try:
             return fn(*args)
         except Exception as exc:  # noqa: BLE001
-            log.warning("Verificarea %s a esuat: %s", check, exc)
-            return CheckResult(check, UNKNOWN, f"Verificarea nu a putut rula: {exc}")
+            log.warning("Check %s failed: %s", check, exc)
+            return CheckResult(check, UNKNOWN, f"Check could not run: {exc}")
 
-    # -- verificari individuale
+    # -- individual checks
 
     def _check_agents_active(self, agents: list[dict], _mv) -> CheckResult:
         if not agents:
-            return CheckResult("agents_active", FAIL, "Niciun agent inregistrat in afara managerului.")
+            return CheckResult("agents_active", FAIL, "No agents registered apart from the manager.")
         by_status: dict[str, list[str]] = {}
         for a in agents:
             by_status.setdefault(a.get("status", "unknown"), []).append(a.get("name", a.get("id")))
@@ -259,29 +259,29 @@ class WazuhCollector(BaseCollector):
         problems = {s: n for s, n in by_status.items() if s != "active"}
         raw = {"total": len(agents), "by_status": by_status}
         if not problems:
-            return CheckResult("agents_active", PASS, f"Toti cei {active} agenti sunt activi.", raw)
+            return CheckResult("agents_active", PASS, f"All {active} agents are active.", raw)
         detail = ", ".join(f"{s}: {', '.join(n)}" for s, n in problems.items())
         return CheckResult("agents_active", FAIL,
-                           f"{active}/{len(agents)} agenti activi. Probleme: {detail}", raw)
+                           f"{active}/{len(agents)} agents active. Issues: {detail}", raw)
 
     def _check_agents_version(self, agents: list[dict], manager_version: str | None) -> CheckResult:
         mv = _version_tuple(manager_version)
         if not agents or not mv:
-            return CheckResult("agents_version", UNKNOWN, "Nu exista agenti sau versiunea managerului lipseste.")
-        outdated = [f"{a.get('name')} ({a.get('version') or 'necunoscuta'})" for a in agents
+            return CheckResult("agents_version", UNKNOWN, "No agents, or the manager version is missing.")
+        outdated = [f"{a.get('name')} ({a.get('version') or 'unknown'})" for a in agents
                     if _version_tuple(a.get("version"))[:2] != mv[:2]]
         raw = {"manager_version": manager_version,
                "agents": {a.get("name"): a.get("version") for a in agents}}
         if not outdated:
             return CheckResult("agents_version", PASS,
-                               f"Toti agentii ruleaza versiunea {manager_version} (major.minor).", raw)
+                               f"All agents run the manager version {manager_version} (major.minor).", raw)
         return CheckResult("agents_version", FAIL,
-                           f"{len(outdated)} agenti nu au versiunea managerului {manager_version}: "
+                           f"{len(outdated)} agents differ from manager version {manager_version}: "
                            + ", ".join(outdated), raw)
 
     def _check_sca(self, api: WazuhAPI, active: list[dict]) -> CheckResult:
         if not active:
-            return CheckResult("sca", UNKNOWN, "Niciun agent activ pentru evaluarea SCA.")
+            return CheckResult("sca", UNKNOWN, "No active agents to evaluate SCA.")
         per_agent: dict[str, list[dict]] = {}
         below, no_scan = [], []
         for a in active:
@@ -299,17 +299,17 @@ class WazuhCollector(BaseCollector):
         avg = round(sum(scores) / len(scores)) if scores else 0
         if not below and not no_scan:
             return CheckResult("sca", PASS,
-                               f"Toti agentii activi au scor SCA >= {config.SCA_MIN_SCORE}% (medie {avg}%).", raw)
+                               f"All active agents have an SCA score >= {config.SCA_MIN_SCORE}% (average {avg}%).", raw)
         parts = []
         if below:
-            parts.append(f"sub {config.SCA_MIN_SCORE}%: {', '.join(below)}")
+            parts.append(f"below {config.SCA_MIN_SCORE}%: {', '.join(below)}")
         if no_scan:
-            parts.append(f"fara scanare SCA: {', '.join(no_scan)}")
-        return CheckResult("sca", FAIL, f"Scor SCA mediu {avg}%. " + "; ".join(parts), raw)
+            parts.append(f"no SCA scan: {', '.join(no_scan)}")
+        return CheckResult("sca", FAIL, f"Average SCA score {avg}%. " + "; ".join(parts), raw)
 
     def _check_fim(self, api: WazuhAPI, active: list[dict]) -> CheckResult:
         if not active:
-            return CheckResult("fim", UNKNOWN, "Niciun agent activ pentru verificarea FIM.")
+            return CheckResult("fim", UNKNOWN, "No active agents to check FIM.")
         now = self._utcnow()
         stale, last = [], {}
         for a in active:
@@ -321,14 +321,14 @@ class WazuhCollector(BaseCollector):
         raw = {"max_age_hours": config.FIM_MAX_AGE_HOURS, "last_scan_end": last}
         if not stale:
             return CheckResult("fim", PASS,
-                               f"FIM a rulat pe toti cei {len(active)} agenti activi in ultimele "
-                               f"{config.FIM_MAX_AGE_HOURS} ore.", raw)
+                               f"FIM ran on all {len(active)} active agents in the last "
+                               f"{config.FIM_MAX_AGE_HOURS} hours.", raw)
         return CheckResult("fim", FAIL,
-                           f"Fara scanare FIM recenta (> {config.FIM_MAX_AGE_HOURS}h) pe: {', '.join(stale)}", raw)
+                           f"No recent FIM scan (> {config.FIM_MAX_AGE_HOURS}h) on: {', '.join(stale)}", raw)
 
     def _check_syscollector(self, api: WazuhAPI, active: list[dict]) -> CheckResult:
         if not active:
-            return CheckResult("syscollector", UNKNOWN, "Niciun agent activ pentru inventar.")
+            return CheckResult("syscollector", UNKNOWN, "No active agents for inventory.")
         inventory, missing = {}, []
         for a in active:
             os_items = api.get(f"/syscollector/{a['id']}/os").get("affected_items") or []
@@ -341,8 +341,8 @@ class WazuhCollector(BaseCollector):
         if not missing:
             total_pkgs = sum(v["packages"] for v in inventory.values())
             return CheckResult("syscollector", PASS,
-                               f"Inventar complet pentru {len(active)} agenti ({total_pkgs} pachete).", raw)
-        return CheckResult("syscollector", FAIL, f"Inventar incomplet pentru: {', '.join(missing)}", raw)
+                               f"Complete inventory for {len(active)} agents ({total_pkgs} packages).", raw)
+        return CheckResult("syscollector", FAIL, f"Incomplete inventory for: {', '.join(missing)}", raw)
 
     def _check_alerts_recent(self, idx: WazuhIndexer) -> CheckResult:
         days = config.ALERTS_WINDOW_DAYS
@@ -354,16 +354,16 @@ class WazuhCollector(BaseCollector):
                 {"key": "high", "from": 12}]}}},
         })
         if resp is None:
-            return CheckResult("alerts_recent", FAIL, "Indexul wazuh-alerts-* nu exista.")
+            return CheckResult("alerts_recent", FAIL, "The wazuh-alerts-* index does not exist.")
         total = resp["hits"]["total"]["value"]
         levels = {b["key"]: b["doc_count"] for b in resp["aggregations"]["levels"]["buckets"]}
         raw = {"window_days": days, "total": total, "by_level": levels}
         if total == 0:
             return CheckResult("alerts_recent", FAIL,
-                               f"Nicio alerta in ultimele {days} zile: monitorizarea pare oprita.", raw)
+                               f"No alerts in the last {days} days: monitoring appears to be down.", raw)
         return CheckResult("alerts_recent", PASS,
-                           f"{total} alerte in ultimele {days} zile (nivel 12+: {levels.get('high', 0)}, "
-                           f"7-11: {levels.get('medium', 0)}). Revizuirea lor se documenteaza manual.", raw)
+                           f"{total} alerts in the last {days} days (level 12+: {levels.get('high', 0)}, "
+                           f"7-11: {levels.get('medium', 0)}). Alert review is documented manually.", raw)
 
     def _check_vulnerabilities(self, idx: WazuhIndexer) -> CheckResult:
         resp = idx.search("wazuh-states-vulnerabilities-*", {
@@ -372,13 +372,13 @@ class WazuhCollector(BaseCollector):
         })
         if resp is None:
             return CheckResult("vulnerabilities", UNKNOWN,
-                               "Indexul de vulnerabilitati nu exista: Vulnerability Detection este activ?")
+                               "The vulnerability index does not exist: is Vulnerability Detection enabled?")
         sev = {b["key"]: b["doc_count"] for b in resp["aggregations"]["severity"]["buckets"]}
         total = resp["hits"]["total"]["value"]
         raw = {"total": total, "by_severity": sev}
-        summary = ", ".join(f"{k}: {v}" for k, v in sorted(sev.items())) or "niciuna"
+        summary = ", ".join(f"{k}: {v}" for k, v in sorted(sev.items())) or "none"
         if sev.get("Critical", 0) > 0:
             return CheckResult("vulnerabilities", FAIL,
-                               f"{sev['Critical']} vulnerabilitati critice deschise. Total {total} ({summary}).", raw)
+                               f"{sev['Critical']} open critical vulnerabilities. Total {total} ({summary}).", raw)
         return CheckResult("vulnerabilities", PASS,
-                           f"Nicio vulnerabilitate critica. Total {total} ({summary}).", raw)
+                           f"No critical vulnerabilities. Total {total} ({summary}).", raw)

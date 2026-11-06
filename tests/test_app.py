@@ -55,7 +55,7 @@ def test_pages_render():
 
 def test_catalog_file_is_valid():
     data = yaml.safe_load(NIS2_FILE.read_text(encoding="utf-8"))
-    catalog.validate(data, NIS2_FILE.name)  # nu arunca exceptie
+    catalog.validate(data, NIS2_FILE.name)  # must not raise
 
 
 @pytest.mark.parametrize("broken, message", [
@@ -67,7 +67,7 @@ def test_catalog_file_is_valid():
     ({"framework": {"id": "x", "name": "X"},
       "categories": [{"id": "a", "reference": "r", "title": "t",
                       "controls": [{"id": "x-1", "title": "T"}, {"id": "x-1", "title": "T2"}]}]},
-     "duplicat"),
+     "duplicate"),
 ])
 def test_invalid_catalog_is_rejected(broken, message):
     with pytest.raises(catalog.CatalogError, match=message):
@@ -84,7 +84,7 @@ def test_reload_is_idempotent():
 
 
 def test_migration_from_v0_1_schema(tmp_path: Path):
-    """O baza de date creata de v0.1.0 primeste coloanele noi fara sa piarda date."""
+    """A database created by v0.1.0 gets the new columns without losing data."""
     old_db = tmp_path / "comply.db"
     conn = sqlite3.connect(old_db)
     conn.executescript("""

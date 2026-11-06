@@ -1,4 +1,4 @@
-"""Testeaza colectorul Wazuh cu un server Wazuh simulat (fara retea)."""
+"""Tests the Wazuh collector against a simulated Wazuh server (no network)."""
 import os
 import tempfile
 from datetime import datetime, timedelta, timezone
@@ -23,7 +23,7 @@ def items(lst, total=None):
 
 
 class FakeWazuhAPI:
-    """Simuleaza raspunsurile Wazuh Server API 4.x."""
+    """Simulates Wazuh Server API 4.x responses."""
 
     def __init__(self, expire_token_once=False):
         self.auth_calls = 0
@@ -112,9 +112,9 @@ def test_all_checks_produce_expected_status(wazuh_env):
     assert r["agents_version"].status == "fail" and "db01" in r["agents_version"].summary
     assert r["sca"].status == "fail" and "db01 (55%)" in r["sca"].summary
     assert r["fim"].status == "fail" and "db01" in r["fim"].summary
-    assert r["syscollector"].status == "pass" and "1452 pachete" in r["syscollector"].summary
+    assert r["syscollector"].status == "pass" and "1452 packages" in r["syscollector"].summary
     assert r["alerts_recent"].status == "pass" and "1234" in r["alerts_recent"].summary
-    assert r["vulnerabilities"].status == "fail" and "4 vulnerabilitati critice" in r["vulnerabilities"].summary
+    assert r["vulnerabilities"].status == "fail" and "4 open critical vulnerabilities" in r["vulnerabilities"].summary
 
 
 def test_manager_agent_is_excluded(wazuh_env):
@@ -134,8 +134,8 @@ def test_bad_credentials_give_unknown_not_crash(wazuh_env):
         return httpx.Response(401)
     r = by_check(make_collector(api=deny).collect())
     assert r["agents_active"].status == "unknown"
-    assert "Autentificare esuata" in r["agents_active"].summary
-    assert r["alerts_recent"].status == "pass"   # indexer-ul merge independent
+    assert "Authentication failed" in r["agents_active"].summary
+    assert r["alerts_recent"].status == "pass"   # the indexer works independently
 
 
 def test_missing_vulnerability_index_is_unknown(wazuh_env):
@@ -150,7 +150,7 @@ def test_missing_vulnerability_index_is_unknown(wazuh_env):
 def test_indexer_not_configured(wazuh_env, monkeypatch):
     monkeypatch.setattr(config, "WAZUH_INDEXER_URL", "")
     r = by_check(make_collector().collect())
-    assert r["alerts_recent"].status == "unknown" and "neconfigurat" in r["alerts_recent"].summary
+    assert r["alerts_recent"].status == "unknown" and "not configured" in r["alerts_recent"].summary
 
 
 def test_test_connection(wazuh_env):
@@ -166,20 +166,20 @@ def test_collection_saves_evidence_on_controls(wazuh_env):
         assert latest["nis2-b-02"]["status"] == "fail"     # agents_active
         assert latest["nis2-i-01"]["status"] == "pass"     # syscollector
         assert latest["nis2-e-01"]["status"] == "fail"     # vulnerabilities
-        assert "nis2-a-01" not in latest                   # control manual, fara dovezi
+        assert "nis2-a-01" not in latest                   # manual control, no evidence
 
         api = client.get("/api/frameworks/nis2/controls").json()
         assert api["status_counts"]["pass"] >= 2
         page = client.get("/controls")
         assert "laptop7" in page.text
         home = client.get("/")
-        assert "Ultima colectare" in home.text
+        assert "Last collection" in home.text
 
 
 def test_unconfigured_source_does_not_run(monkeypatch):
     monkeypatch.setattr(config, "WAZUH_URL", "")
     result = evidence.run_collection("wazuh", WazuhCollector())
-    assert not result["ok"] and "nu este configurat" in result["message"]
+    assert not result["ok"] and "not configured" in result["message"]
 
 
 def test_ui_buttons_redirect_with_message(wazuh_env, monkeypatch):
@@ -188,5 +188,5 @@ def test_ui_buttons_redirect_with_message(wazuh_env, monkeypatch):
         r = client.post("/sources/wazuh/test", follow_redirects=False)
         assert r.status_code == 303 and "ok=1" in r.headers["location"]
         r = client.post("/sources/wazuh/collect")
-        assert r.status_code == 200 and "verificari" in r.text
+        assert r.status_code == 200 and "checks:" in r.text
         assert client.post("/api/sources/opnsense/collect").status_code == 404

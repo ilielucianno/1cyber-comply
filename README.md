@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.3.0) — stage 2a, Wazuh collector.
+**Status:** early development (v0.3.1) — stage 2a, Wazuh collector.
 
 ## Why
 

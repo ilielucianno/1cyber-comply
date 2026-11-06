@@ -1,8 +1,8 @@
-"""Interfata comuna pentru toti colectorii (Wazuh, OPNsense, ...).
+"""Common interface for all collectors (Wazuh, OPNsense, ...).
 
-Fiecare colector nou mosteneste BaseCollector si implementeaza collect().
-Un colector produce rezultate per verificare ("check"). Runner-ul le leaga de
-controalele care au in YAML `automation: <name>:<check>`.
+Each collector subclasses BaseCollector and implements collect().
+A collector returns one result per check. The runner links each result to the
+controls whose YAML entry has `automation: <name>:<check>`.
 """
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
@@ -12,7 +12,7 @@ PASS, FAIL, UNKNOWN = "pass", "fail", "unknown"
 
 @dataclass
 class CheckResult:
-    check: str             # ex: agents_active (fara prefixul sursei)
+    check: str             # e.g. agents_active (without the source prefix)
     status: str            # pass | fail | unknown
     summary: str
     raw: dict = field(default_factory=dict)
@@ -23,13 +23,13 @@ class BaseCollector(ABC):
 
     @abstractmethod
     def is_configured(self) -> bool:
-        """True daca exista URL/credentiale in .env."""
+        """True when URL and credentials are set in .env."""
 
     @abstractmethod
     def test_connection(self) -> tuple[bool, str]:
-        """Verifica legatura cu sursa. Returneaza (ok, mesaj)."""
+        """Check connectivity to the source. Returns (ok, message)."""
 
     @abstractmethod
     def collect(self) -> list[CheckResult]:
-        """Ruleaza toate verificarile. O verificare care esueaza devine 'unknown',
-        nu opreste celelalte verificari."""
+        """Run all checks. A failing check becomes 'unknown' and never stops
+        the remaining checks."""

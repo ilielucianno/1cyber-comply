@@ -1,5 +1,5 @@
 {% extends "base.html" %}
-{% block title %}Controale {{ framework.name }} · {{ app_name }}{% endblock %}
+{% block title %}Controls {{ framework.name }} · {{ app_name }}{% endblock %}
 {% block content %}
 <p class="muted" style="margin-top:0">{{ framework.name }} {{ framework.version }} — {{ framework.description }}</p>
 <p>
@@ -17,14 +17,14 @@
     <div>
       <div><strong>{{ c.title }}</strong> <code>{{ c.id }}</code></div>
       <div class="muted" style="font-size:14px">{{ c.description }}</div>
-      {% if c.evidence_hint %}<div style="font-size:13px;margin-top:4px">Dovada: <span class="muted">{{ c.evidence_hint }}</span></div>{% endif %}
+      {% if c.evidence_hint %}<div style="font-size:13px;margin-top:4px">Evidence: <span class="muted">{{ c.evidence_hint }}</span></div>{% endif %}
       {% if e %}
       <div class="evidence"><span class="st {{ e.status }}">{{ e.status }}</span> {{ e.summary }}
         <span class="muted">· {{ e.source }} · {{ e.collected_at }} UTC</span></div>
       {% endif %}
     </div>
     <div style="text-align:right">
-      <span class="tag {{ c.check_type }}">{{ 'automat' if c.check_type == 'automated' else 'manual' }}</span>
+      <span class="tag {{ c.check_type }}">{{ 'automated' if c.check_type == 'automated' else 'manual' }}</span>
       {% if c.automation %}<div><code>{{ c.automation }}</code></div>{% endif %}
     </div>
   </div>

@@ -12,7 +12,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY app ./app
 COPY controls ./controls
 
-# Ruleaza ca user neprivilegiat (bun si pentru un tool de securitate)
+# Run as an unprivileged user
 RUN useradd --create-home --uid 1000 comply && mkdir -p /data && chown comply:comply /data
 USER comply
 
