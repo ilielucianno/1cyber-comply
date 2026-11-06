@@ -1,0 +1,16 @@
+# Host-network mode: use when 1cyber Comply runs on the same machine as Wazuh
+# and the Wazuh Indexer listens only on 127.0.0.1 (default for all-in-one installs).
+#
+# Enable it by adding this line to .env:
+#   COMPOSE_FILE=docker-compose.yml:docker-compose.hostnet.yml
+# and use 127.0.0.1 in WAZUH_URL / WAZUH_INDEXER_URL.
+#
+# The web UI still listens on 127.0.0.1 only.
+services:
+  comply:
+    network_mode: host
+    ports: !reset []
+    extra_hosts: !reset []
+    environment:
+      COMPLY_HOST: 127.0.0.1
+      COMPLY_PORT: "8080"

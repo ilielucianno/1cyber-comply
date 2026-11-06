@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.3.1) — stage 2a, Wazuh collector.
+**Status:** early development (v0.3.2) — stage 2a, Wazuh collector.
 
 ## Why
 
@@ -55,6 +55,17 @@ WAZUH_PASSWORD=...
 
 Alerts and vulnerabilities live in the Wazuh Indexer (Wazuh 4.8+). Optionally add a
 read-only indexer user with `WAZUH_INDEXER_URL`, `WAZUH_INDEXER_USER`, `WAZUH_INDEXER_PASSWORD`.
+
+**Wazuh on the same machine (all-in-one install).** The Wazuh Indexer usually listens only on
+`127.0.0.1`, which a container cannot reach. Enable host-network mode by adding to `.env`:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.hostnet.yml
+WAZUH_URL=https://127.0.0.1:55000
+WAZUH_INDEXER_URL=https://127.0.0.1:9200
+```
+
+The web UI still listens on 127.0.0.1 only.
 
 > Security note: until stage 5 the web UI has no login. Keep it bound to 127.0.0.1 (default).
 

@@ -16,7 +16,11 @@ COPY controls ./controls
 RUN useradd --create-home --uid 1000 comply && mkdir -p /data && chown comply:comply /data
 USER comply
 
-EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import urllib.request;urllib.request.urlopen('http://127.0.0.1:8080/health')"
+# Listen address and port. Host-network mode sets COMPLY_HOST=127.0.0.1
+ENV COMPLY_HOST=0.0.0.0 \
+    COMPLY_PORT=8080
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8080"]
+EXPOSE 8080
+HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import os,urllib.request;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"COMPLY_PORT\",\"8080\")}/health')"
+
+CMD ["sh", "-c", "exec uvicorn app.main:app --host \"$COMPLY_HOST\" --port \"$COMPLY_PORT\""]
