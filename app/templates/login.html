@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}Log in · {{ app_name }}{% endblock %}
+{% block content %}
+<div style="max-width:380px;margin:40px auto">
+  {% if flash %}<div class="flash err">{{ flash }}</div>{% endif %}
+  <div class="card">
+    <h1 style="font-size:20px;margin:0 0 16px">Log in</h1>
+    <form method="post" action="/login" class="form">
+      <input type="hidden" name="next" value="{{ next }}">
+      <label>Username <input name="username" autocomplete="username" required autofocus></label>
+      <label>Password <input type="password" name="password" autocomplete="current-password" required></label>
+      <div><button type="submit">Log in</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

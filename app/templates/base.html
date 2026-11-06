@@ -64,10 +64,21 @@
 <body>
 <header>
   <h1>{{ app_name }}</h1>
+  {% set me = request.state.user if request.state.user is defined else none %}
   <nav>
+    {% if me %}
     <a href="/" class="{{ 'active' if page == 'home' }}">Dashboard</a>
     <a href="/controls" class="{{ 'active' if page == 'controls' }}">Controls</a>
+    {% if me.role == 'admin' %}
+    <a href="/users" class="{{ 'active' if page == 'users' }}">Users</a>
+    <a href="/audit" class="{{ 'active' if page == 'audit' }}">Audit log</a>
+    {% endif %}
+    {% endif %}
   </nav>
+  {% if me %}
+  <span class="ver"><a href="/account" style="color:inherit">{{ me.username }}</a> · {{ me.role }}</span>
+  <form method="post" action="/logout"><input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><button>Log out</button></form>
+  {% endif %}
   <span class="ver">v{{ version }}</span>
 </header>
 <main>

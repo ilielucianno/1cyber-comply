@@ -6,7 +6,7 @@ os.environ.setdefault("COMPLY_DATA_DIR", tempfile.mkdtemp())
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from helpers import LoggedInClient  # noqa: E402
 
 from app import config, evidence  # noqa: E402
 from app.collectors.opnsense import OPNsenseCollector, analyse_ruleset, parse_version  # noqa: E402
@@ -182,7 +182,7 @@ def test_test_connection(opn_env):
 
 
 def test_collection_saves_on_nis2_controls(opn_env):
-    with TestClient(app):
+    with LoggedInClient(app):
         result = evidence.run_collection("opnsense", make())
         assert result["ok"] and result["saved"] == 6
         latest = evidence.latest_by_control("nis2")

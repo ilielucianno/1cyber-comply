@@ -2,7 +2,7 @@
 import time
 
 import pytest
-from fastapi.testclient import TestClient
+from helpers import LoggedInClient
 
 from app import config, evidence, scoring
 from app.collectors.base import BaseCollector, CheckResult
@@ -31,7 +31,7 @@ class StaticCollector(BaseCollector):
 
 @pytest.fixture
 def clean_db():
-    with TestClient(app):
+    with LoggedInClient(app):
         with get_conn() as conn:
             conn.execute("DELETE FROM attachments")
             conn.execute("DELETE FROM evidence")
@@ -126,7 +126,7 @@ def test_chart_svg():
 
 
 def test_dashboard_and_api(clean_db):
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         evidence.run_collection("wazuh", StaticCollector([CheckResult("agents_active", "pass", "ok")]))
         page = client.get("/")
         assert "compliance score" in page.text and "<svg" in page.text

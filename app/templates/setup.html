@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}First-time setup · {{ app_name }}{% endblock %}
+{% block content %}
+<div style="max-width:440px;margin:40px auto">
+  {% if flash %}<div class="flash err">{{ flash }}</div>{% endif %}
+  <div class="card">
+    <h1 style="font-size:20px;margin:0 0 6px">Create the administrator account</h1>
+    <p class="muted" style="margin:0 0 16px;font-size:14px">This page is available only until the first account exists.
+      Use at least 12 characters with a mix of letters, digits or symbols.</p>
+    <form method="post" action="/setup" class="form">
+      <label>Username <input name="username" autocomplete="username" required autofocus></label>
+      <label>Password <input type="password" name="password" autocomplete="new-password" minlength="12" required></label>
+      <label>Confirm password <input type="password" name="confirm" autocomplete="new-password" minlength="12" required></label>
+      <div><button type="submit">Create administrator</button></div>
+    </form>
+  </div>
+</div>
+{% endblock %}

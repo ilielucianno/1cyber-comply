@@ -13,10 +13,11 @@
   {% if control.evidence_hint %}<div style="margin-top:8px;font-size:14px">Expected evidence: <span class="muted">{{ control.evidence_hint }}</span></div>{% endif %}
 </div>
 
-{% if control.check_type == 'manual' %}
+{% if control.check_type == 'manual' and request.state.user.role in ('admin', 'editor') %}
 <h2>Add evidence</h2>
 <div class="card">
   <form method="post" action="/controls/{{ framework.id }}/{{ control.id }}/evidence" enctype="multipart/form-data" class="form">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
     <label>Assessment
       <select name="status" required>
         <option value="pass">Pass: the evidence shows the control is in place</option>
@@ -27,7 +28,7 @@
       <textarea name="note" rows="3" required></textarea>
     </label>
     <div class="cols">
-      <label>Reviewer name <input name="reviewer" required></label>
+      <label>Reviewer <input value="{{ request.state.user.username }}" disabled></label>
       <label>Valid until <input type="date" name="valid_until" value="{{ default_valid_until }}" min="{{ today }}"></label>
     </div>
     <label>File <span class="muted">(optional, max 10 MB: {{ allowed }})</span>

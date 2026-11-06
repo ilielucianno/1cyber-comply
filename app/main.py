@@ -6,11 +6,12 @@ from urllib.parse import quote
 
 from datetime import date, timedelta
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, UploadFile
+from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, UploadFile
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from app import catalog, config, evidence, manual, report, scoring
+from app import auth, auth_routes, catalog, config, evidence, manual, report, scoring
+from app.guard import client_ip, guard
 from app.scheduler import run_all, scheduler
 from app.db import get_conn, init_db
 
@@ -27,7 +28,28 @@ async def lifespan(_app: FastAPI):
     scheduler.stop()
 
 
-app = FastAPI(title=config.APP_NAME, version=config.APP_VERSION, lifespan=lifespan)
+app = FastAPI(title=config.APP_NAME, version=config.APP_VERSION, lifespan=lifespan,
+              dependencies=[Depends(guard)], docs_url=None, redoc_url=None, openapi_url=None)
+auth_routes.templates = templates
+app.include_router(auth_routes.router)
+
+
+@app.middleware("http")
+async def security_headers(request: Request, call_next):
+    response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "same-origin")
+    response.headers.setdefault("Content-Security-Policy",
+                                "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; "
+                                "frame-ancestors 'none'; form-action 'self'")
+    if request.url.scheme == "https":
+        response.headers.setdefault("Strict-Transport-Security", "max-age=31536000")
+    return response
+
+
+def _who(request: Request) -> str:
+    return request.state.user["username"] if getattr(request.state, "user", None) else "system"
 
 
 def _stats() -> dict:
@@ -119,7 +141,8 @@ def api_schedule():
 
 
 @app.post("/api/collect-all")
-def api_collect_all():
+def api_collect_all(request: Request):
+    auth.audit("collect.all", _who(request), ip=client_ip(request))
     return run_all()
 
 
@@ -130,7 +153,8 @@ def api_test_source(source: str):
 
 
 @app.post("/api/sources/{source}/collect")
-def api_collect(source: str):
+def api_collect(request: Request, source: str):
+    auth.audit("collect.source", _who(request), source, client_ip(request))
     return evidence.run_collection(source, _collector(source))
 
 
@@ -143,14 +167,16 @@ def ui_test_source(source: str):
 
 
 @app.post("/sources/{source}/collect")
-def ui_collect(source: str):
+def ui_collect(request: Request, source: str):
+    auth.audit("collect.source", _who(request), source, client_ip(request))
     result = evidence.run_collection(source, _collector(source))
     return RedirectResponse(f"/?ok={int(result['ok'])}&msg={quote(f'{source}: ' + result['message'])}",
                             status_code=303)
 
 
 @app.post("/collect-all")
-def ui_collect_all():
+def ui_collect_all(request: Request):
+    auth.audit("collect.all", _who(request), ip=client_ip(request))
     results = run_all()
     ok = all(r["ok"] for r in results.values()) if results else False
     msg = "; ".join(f"{k}: {v['message']}" for k, v in results.items() if k != "comply") or "No sources configured"
@@ -209,9 +235,10 @@ def control_page(request: Request, framework_id: str, control_id: str, msg: str 
 
 
 @app.post("/controls/{framework_id}/{control_id}/evidence")
-async def add_evidence(framework_id: str, control_id: str,
-                       status: str = Form(...), note: str = Form(""), reviewer: str = Form(""),
+async def add_evidence(request: Request, framework_id: str, control_id: str,
+                       status: str = Form(...), note: str = Form(""),
                        valid_until: str = Form(""), file: UploadFile | None = File(None)):
+    reviewer = _who(request)   # always the logged-in user, cannot be typed in
     _control(framework_id, control_id)
     upload = None
     if file is not None and file.filename:
@@ -223,6 +250,8 @@ async def add_evidence(framework_id: str, control_id: str,
     except manual.EvidenceError as exc:
         return RedirectResponse(f"{base}?ok=0&msg={quote(str(exc))}", status_code=303)
     scoring.snapshot_all()
+    auth.audit("evidence.added", reviewer, f"{control_id} {status}" + (f" + {upload.filename}" if upload else ""),
+               client_ip(request))
     return RedirectResponse(f"{base}?ok=1&msg={quote('Evidence saved.')}", status_code=303)
 
 

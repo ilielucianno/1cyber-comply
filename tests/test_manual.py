@@ -2,7 +2,7 @@
 from datetime import date, timedelta
 
 import pytest
-from fastapi.testclient import TestClient
+from helpers import LoggedInClient
 
 from app import evidence, manual, scoring
 from app.db import get_conn
@@ -13,7 +13,7 @@ NEXT_YEAR = (date.today() + timedelta(days=365)).isoformat()
 
 @pytest.fixture
 def client():
-    with TestClient(app) as c:
+    with LoggedInClient(app) as c:
         with get_conn() as conn:
             conn.execute("DELETE FROM attachments")
             conn.execute("DELETE FROM evidence")
@@ -32,7 +32,7 @@ def test_upload_with_file_counts_as_pass(client):
                     files={"file": ("policy.pdf", b"%PDF-1.4 test", "application/pdf")}, follow_redirects=False)
     assert r.status_code == 303 and "ok=1" in r.headers["location"]
     e = evidence.latest_by_control("nis2")["nis2-a-01"]
-    assert e["status"] == "pass" and e["reviewer"] == "Ilie Lucian" and e["attachment_count"] == 1
+    assert e["status"] == "pass" and e["reviewer"] == "test-admin"   # reviewer is always the logged-in user and e["attachment_count"] == 1
     assert scoring.compute("nis2")["manual_score"] > 0
     assert len(scoring.history("nis2")) == 1               # snapshot after saving
 
@@ -61,7 +61,6 @@ def test_expired_evidence_counts_as_fail(client):
 
 @pytest.mark.parametrize("overrides, files, message", [
     ({"note": ""}, None, "note"),
-    ({"reviewer": " "}, None, "reviewer"),
     ({"status": "maybe"}, None, "pass or fail"),
     ({"valid_until": "2020-01-01"}, None, "past"),
     ({}, {"file": ("evil.html", b"<script>", "text/html")}, "not allowed"),

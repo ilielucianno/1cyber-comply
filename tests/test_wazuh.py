@@ -7,7 +7,7 @@ os.environ.setdefault("COMPLY_DATA_DIR", tempfile.mkdtemp())
 
 import httpx  # noqa: E402
 import pytest  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from helpers import LoggedInClient  # noqa: E402
 
 from app import config, evidence  # noqa: E402
 from app.collectors.wazuh import WazuhCollector, _version_tuple  # noqa: E402
@@ -165,7 +165,7 @@ def test_test_connection(wazuh_env):
 
 
 def test_collection_saves_evidence_on_controls(wazuh_env):
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         result = evidence.run_collection("wazuh", make_collector())
         assert result["ok"] and result["saved"] == 7
         latest = evidence.latest_by_control("nis2")
@@ -190,7 +190,7 @@ def test_unconfigured_source_does_not_run(monkeypatch):
 
 def test_ui_buttons_redirect_with_message(wazuh_env, monkeypatch):
     monkeypatch.setattr(evidence, "get_collectors", lambda: {"wazuh": make_collector()})
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         r = client.post("/sources/wazuh/test", follow_redirects=False)
         assert r.status_code == 303 and "ok=1" in r.headers["location"]
         r = client.post("/sources/wazuh/collect")

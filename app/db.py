@@ -73,6 +73,36 @@ CREATE TABLE IF NOT EXISTS attachments (
     uploaded_at  TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
+CREATE TABLE IF NOT EXISTS users (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    username        TEXT NOT NULL UNIQUE COLLATE NOCASE,
+    password_hash   TEXT NOT NULL,         -- scrypt$N$r$p$salt$hash
+    role            TEXT NOT NULL,         -- admin | editor | viewer
+    disabled        INTEGER NOT NULL DEFAULT 0,
+    failed_attempts INTEGER NOT NULL DEFAULT 0,
+    locked_until    TEXT,
+    must_change_password INTEGER NOT NULL DEFAULT 0,
+    created_at      TEXT NOT NULL DEFAULT (datetime('now')),
+    last_login      TEXT
+);
+
+CREATE TABLE IF NOT EXISTS sessions (
+    token_hash  TEXT PRIMARY KEY,          -- sha256 of the cookie value; the raw token is never stored
+    user_id     INTEGER NOT NULL REFERENCES users(id),
+    csrf_token  TEXT NOT NULL,
+    created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+    expires_at  TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS audit_log (
+    id        INTEGER PRIMARY KEY AUTOINCREMENT,
+    at        TEXT NOT NULL DEFAULT (datetime('now')),
+    username  TEXT,
+    action    TEXT NOT NULL,
+    detail    TEXT,
+    ip        TEXT
+);
+
 CREATE INDEX IF NOT EXISTS idx_score_fw ON score_history(framework_id, taken_at);
 """
 

@@ -7,7 +7,7 @@ os.environ["COMPLY_DATA_DIR"] = tempfile.mkdtemp()
 
 import pytest  # noqa: E402
 import yaml  # noqa: E402
-from fastapi.testclient import TestClient  # noqa: E402
+from helpers import LoggedInClient  # noqa: E402
 
 from app import catalog, config, db  # noqa: E402
 from app.main import app  # noqa: E402
@@ -16,14 +16,14 @@ NIS2_FILE = config.CONTROLS_DIR / "nis2.yaml"
 
 
 def test_health():
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         r = client.get("/health")
         assert r.status_code == 200
         assert r.json()["status"] == "ok"
 
 
 def test_status_counts_nis2_controls():
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         stats = client.get("/api/status").json()["stats"]
         assert stats["frameworks"] >= 1
         assert stats["controls"] == stats["automated"] + stats["manual"]
@@ -31,7 +31,7 @@ def test_status_counts_nis2_controls():
 
 
 def test_nis2_has_all_article_21_categories():
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         data = client.get("/api/frameworks/nis2/controls").json()
         assert [c["id"] for c in data["categories"]] == list("abcdefghij")
         for cat in data["categories"]:
@@ -39,13 +39,13 @@ def test_nis2_has_all_article_21_categories():
 
 
 def test_unknown_framework_returns_404():
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         assert client.get("/api/frameworks/nope/controls").status_code == 404
         assert client.get("/controls/nope").status_code == 404
 
 
 def test_pages_render():
-    with TestClient(app) as client:
+    with LoggedInClient(app) as client:
         home = client.get("/")
         assert home.status_code == 200 and "NIS2 Directive" in home.text
         page = client.get("/controls")
@@ -75,7 +75,7 @@ def test_invalid_catalog_is_rejected(broken, message):
 
 
 def test_reload_is_idempotent():
-    with TestClient(app):
+    with LoggedInClient(app):
         first = catalog.load_all()
         second = catalog.load_all()
         assert first == second

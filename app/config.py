@@ -5,7 +5,7 @@ from pathlib import Path
 BASE_DIR = Path(__file__).resolve().parent.parent
 
 APP_NAME = "1cyber Comply"
-APP_VERSION = "0.6.0"
+APP_VERSION = "0.7.0"
 
 # SQLite database (a single file, no separate server)
 DATA_DIR = Path(os.getenv("COMPLY_DATA_DIR", BASE_DIR / "data"))
@@ -47,3 +47,8 @@ COLLECT_START_DELAY_SECONDS = int(os.getenv("COLLECT_START_DELAY_SECONDS", "60")
 
 # Organisation name shown on reports
 ORG_NAME = os.getenv("ORG_NAME", "Your organisation")
+
+# Authentication
+SESSION_HOURS = int(os.getenv("SESSION_HOURS", "12"))
+LOGIN_MAX_ATTEMPTS = int(os.getenv("LOGIN_MAX_ATTEMPTS", "5"))
+LOGIN_LOCK_MINUTES = int(os.getenv("LOGIN_LOCK_MINUTES", "15"))

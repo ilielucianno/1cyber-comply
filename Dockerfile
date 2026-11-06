@@ -7,7 +7,8 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 WORKDIR /app
 
 # DejaVu fonts: PDF reports render diacritics (ă, ș, ț, Greek, ...) correctly
-RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core \
+# openssl: self-signed certificate when COMPLY_TLS=true
+RUN apt-get update && apt-get install -y --no-install-recommends fonts-dejavu-core openssl \
     && rm -rf /var/lib/apt/lists/*
 
 COPY requirements.txt .
@@ -15,6 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY app ./app
 COPY controls ./controls
+COPY docker ./docker
 
 # Run as an unprivileged user
 RUN useradd --create-home --uid 1000 comply && mkdir -p /data && chown comply:comply /data
@@ -25,6 +27,6 @@ ENV COMPLY_HOST=0.0.0.0 \
     COMPLY_PORT=8080
 
 EXPOSE 8080
-HEALTHCHECK --interval=30s --timeout=5s CMD python -c "import os,urllib.request;urllib.request.urlopen(f'http://127.0.0.1:{os.environ.get(\"COMPLY_PORT\",\"8080\")}/health')"
+HEALTHCHECK --interval=30s --timeout=5s CMD python /app/docker/healthcheck.py
 
-CMD ["sh", "-c", "exec uvicorn app.main:app --host \"$COMPLY_HOST\" --port \"$COMPLY_PORT\""]
+CMD ["/app/docker/entrypoint.sh"]

@@ -3,7 +3,7 @@
 Open-source compliance automation for small and medium organisations.
 Collects evidence automatically from your existing security tools and maps it to regulatory controls.
 
-**Status:** early development (v0.6.0) — stage 4, manual evidence and PDF reports.
+**Status:** early development (v0.7.0) — stage 5, login, roles and HTTPS.
 
 ## Why
 
@@ -21,8 +21,8 @@ for free, using tools many teams already run.
 | 2b | OPNsense collector: 6 automated checks | done |
 | 3 | Scheduled collection, compliance score and history | done |
 | 4 | Manual evidence upload, PDF reports | done |
-| 5 | Login, user accounts, HTTPS — required before exposing the app on a network | next |
-| 6 | One-line installer, .deb package | planned |
+| 5 | Login, roles, CSRF protection, audit log, HTTPS | done |
+| 6 | One-line installer, .deb package | next |
 
 ## Quick start (Docker)
 
@@ -41,6 +41,33 @@ python3 -m venv .venv && source .venv/bin/activate
 pip install -r requirements.txt pytest
 pytest -q
 uvicorn app.main:app --reload --port 8080
+```
+
+## Users and security
+
+On first start, open the app and create the administrator account (the setup page closes
+once an account exists). Then add people under **Users**:
+
+| Role | Can |
+|---|---|
+| viewer | read everything, download reports and evidence files (management, auditors) |
+| editor | viewer + add evidence, run collections |
+| admin | editor + test connections, manage users, read the audit log |
+
+- Passwords: scrypt hashes, min. 12 characters; new users get a one-time temporary password
+- Sessions: server-side, revoked on logout, password change or when a user is disabled
+- Lockout after 5 failed logins for 15 minutes; same error for unknown users
+- CSRF token on every state-changing request, SameSite=Strict cookies, strict security headers
+- Evidence is always attributed to the logged-in user; every login, evidence upload, collection
+  and user change is written to the **Audit log**
+
+**HTTPS:** set `COMPLY_TLS=true` (self-signed certificate generated on first start, or provide
+your own in `/data/tls`). To reach the app from other machines, change the port binding in
+`docker-compose.yml` from `127.0.0.1:8080:8080` to `8080:8080` only after enabling HTTPS.
+
+**Locked out?**
+```bash
+docker exec -it 1cyber-comply python -m app.cli reset-password <username>
 ```
 
 ## Compliance score
@@ -92,7 +119,6 @@ WAZUH_INDEXER_URL=https://127.0.0.1:9200
 
 The web UI still listens on 127.0.0.1 only.
 
-> Security note: until stage 5 the web UI has no login. Keep it bound to 127.0.0.1 (default).
 
 ## Connecting OPNsense
 

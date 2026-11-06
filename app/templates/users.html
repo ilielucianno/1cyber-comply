@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}Users · {{ app_name }}{% endblock %}
+{% block content %}
+{% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
+{% if temp %}<div class="card" style="margin-bottom:20px;border-color:var(--off)">
+  Temporary password for <code style="font-size:15px;color:var(--text)">{{ temp }}</code><br>
+  <span class="muted" style="font-size:13px">Shown only now. The user must change it at first login.</span></div>{% endif %}
+
+<h2>Add user</h2>
+<div class="card">
+  <form method="post" action="/users" class="form">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
+    <div class="cols">
+      <label>Username <input name="username" required></label>
+      <label>Role
+        <select name="role">
+          <option value="viewer">viewer: read only (management, auditor)</option>
+          <option value="editor">editor: add evidence, run collections</option>
+          <option value="admin">admin: everything, including users</option>
+        </select>
+      </label>
+    </div>
+    <div><button type="submit">Create user</button></div>
+  </form>
+</div>
+
+<h2>Users</h2>
+<div class="card">
+  {% for u in users %}
+  <div class="row">
+    <div>
+      <strong>{{ u.username }}</strong> <span class="muted">· {{ u.role }}</span>
+      {% if u.disabled %}<span class="st fail">disabled</span>{% endif %}
+      {% if u.must_change_password %}<span class="st unknown">must change password</span>{% endif %}
+      <div class="muted" style="font-size:13px">created {{ u.created_at }} · last login {{ u.last_login or 'never' }}</div>
+    </div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end">
+      <form method="post" action="/users/{{ u.id }}">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><input type="hidden" name="action" value="role">
+        <select name="role">{% for r in roles %}<option value="{{ r }}" {{ 'selected' if r == u.role }}>{{ r }}</option>{% endfor %}</select>
+        <button>Set role</button>
+      </form>
+      <form method="post" action="/users/{{ u.id }}">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><input type="hidden" name="action" value="reset">
+        <button>Reset password</button>
+      </form>
+      {% if u.id != request.state.user.id %}
+      <form method="post" action="/users/{{ u.id }}">
+        <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
+        <input type="hidden" name="action" value="{{ 'enable' if u.disabled else 'disable' }}">
+        <button>{{ 'Enable' if u.disabled else 'Disable' }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}

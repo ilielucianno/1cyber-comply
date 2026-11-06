@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Audit log · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 style="font-size:22px;margin:0 0 16px">Audit log <span class="muted" style="font-size:14px">· latest 200 events</span></h1>
+<div class="card">
+  {% for e in entries %}
+  <div class="row" style="font-size:14px">
+    <div><code>{{ e.action }}</code> {{ e.detail or '' }}</div>
+    <div class="muted" style="text-align:right;white-space:nowrap">{{ e.username or '-' }} · {{ e.ip or '-' }} · {{ e.at }} UTC</div>
+  </div>
+  {% else %}
+  <div class="row muted">No events yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

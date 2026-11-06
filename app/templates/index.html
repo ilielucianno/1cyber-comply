@@ -62,7 +62,9 @@
       <div class="muted" style="font-size:13px">Set COLLECT_INTERVAL_HOURS in .env to enable it.</div>
       {% endif %}
     </div>
-    <form method="post" action="/collect-all"><button>Collect all now</button></form>
+    {% if request.state.user.role in ('admin', 'editor') %}
+    <form method="post" action="/collect-all"><input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><button>Collect all now</button></form>
+    {% endif %}
   </div>
 </div>
 <div class="card">
@@ -77,9 +79,11 @@
       {% endif %}
     </div>
     <div>
-      {% if ok and name in collectors %}
-      <form method="post" action="/sources/{{ name }}/test"><button>Test connection</button></form>
-      <form method="post" action="/sources/{{ name }}/collect"><button>Collect now</button></form>
+      {% if ok and name in collectors and request.state.user.role == 'admin' %}
+      <form method="post" action="/sources/{{ name }}/test"><input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><button>Test connection</button></form>
+      {% endif %}
+      {% if ok and name in collectors and request.state.user.role in ('admin', 'editor') %}
+      <form method="post" action="/sources/{{ name }}/collect"><input type="hidden" name="csrf_token" value="{{ request.state.csrf }}"><button>Collect now</button></form>
       {% elif name not in collectors %}
       <span class="muted" style="font-size:13px">collector in progress</span>
       {% endif %}
