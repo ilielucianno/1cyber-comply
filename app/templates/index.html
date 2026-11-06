@@ -55,7 +55,7 @@
   <div class="row">
     <div>
       {% if schedule.enabled %}
-      Automatic collection every {{ schedule.interval_hours|round(1) }}h
+      Automatic collection every {{ schedule.interval_hours|number }}h
       <div class="muted" style="font-size:13px">Next run: {{ schedule.next_run or '-' }}{% if schedule.last_run %} · last: {{ schedule.last_run }}{% endif %}</div>
       {% else %}
       <span class="off">Automatic collection disabled</span>
@@ -71,7 +71,7 @@
   {% for name, ok in sources.items() %}
   <div class="row">
     <div>
-      <div>{{ name|capitalize }}
+      <div>{{ source_label.get(name, name) }}
         {% if ok %}<span class="ok">configured</span>{% else %}<span class="off">not configured (.env)</span>{% endif %}
       </div>
       {% if runs.get(name) %}

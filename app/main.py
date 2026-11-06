@@ -19,6 +19,24 @@ logging.basicConfig(level=logging.INFO, format="%(levelname)s %(name)s: %(messag
 templates = Jinja2Templates(directory=str(config.BASE_DIR / "app" / "templates"))
 
 
+def _filesize(n: int) -> str:
+    for unit in ("B", "KB", "MB"):
+        if n < 1024 or unit == "MB":
+            return f"{n} {unit}" if unit == "B" else f"{n:.1f} {unit}"
+        n /= 1024
+    return f"{n:.1f} MB"
+
+
+def _number(x: float) -> str:
+    return f"{x:g}"
+
+
+templates.env.filters["filesize"] = _filesize
+templates.env.filters["number"] = _number
+templates.env.globals["source_label"] = {"wazuh": "Wazuh", "opnsense": "OPNsense", "comply": "1cyber Comply",
+                                         "manual": "manual"}
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI):
     init_db()            # create / migrate tables

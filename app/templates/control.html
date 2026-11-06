@@ -46,13 +46,13 @@
     <div>
       <div><span class="st {{ e.status }}">{{ e.status }}</span> {{ e.summary }}</div>
       <div class="muted" style="font-size:13px;margin-top:4px">
-        {{ e.collected_at }} UTC · {{ e.source }}{% if e.reviewer %} · reviewed by {{ e.reviewer }}{% endif %}
+        {{ e.collected_at }} UTC · {{ source_label.get(e.source, e.source) }}{% if e.reviewer %} · reviewed by {{ e.reviewer }}{% endif %}
         {% if e.valid_until %} · valid until {{ e.valid_until }}{% endif %}
       </div>
       {% for a in e.attachments %}
       <div style="font-size:13px;margin-top:4px">
         <a href="/attachments/{{ a.id }}">{{ a.filename }}</a>
-        <span class="muted">· {{ (a.size / 1024)|round(1) }} KB · sha256 {{ a.sha256[:16] }}…</span>
+        <span class="muted">· {{ a.size|filesize }} · sha256 {{ a.sha256[:16] }}…</span>
       </div>
       {% endfor %}
     </div>

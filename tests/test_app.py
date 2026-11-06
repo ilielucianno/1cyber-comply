@@ -106,3 +106,17 @@ def test_migration_from_v0_1_schema(tmp_path: Path):
         assert {"category_id", "automation", "evidence_hint", "sort_order"} <= cols
     finally:
         db.DB_PATH = original
+
+
+def test_demo_seeder_runs_on_empty_database(tmp_path):
+    import os
+    import subprocess
+    import sys
+    env = {**os.environ, "COMPLY_DATA_DIR": str(tmp_path), "COLLECT_INTERVAL_HOURS": "0"}
+    out = subprocess.run([sys.executable, "scripts/seed_demo.py"], env=env, capture_output=True, text=True,
+                         cwd=config.BASE_DIR)
+    assert out.returncode == 0, out.stderr
+    assert '"seeded": true' in out.stdout
+    again = subprocess.run([sys.executable, "scripts/seed_demo.py"], env=env, capture_output=True, text=True,
+                           cwd=config.BASE_DIR)
+    assert again.returncode != 0          # refuses to touch a database that already has evidence

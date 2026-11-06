@@ -1,32 +1,55 @@
 # 1cyber Comply
 
-Open-source compliance automation for small and medium organisations.
-Collects evidence automatically from your existing security tools and maps it to regulatory controls.
+**Open-source NIS2 compliance automation for small and medium organisations.**
 
-**Status:** early development (v0.8.0) — stage 6, one-line installer and .deb package.
+1cyber Comply connects to the security tools you already run, collects evidence with
+read-only access, maps it to the NIS2 Article 21 controls and keeps a live compliance
+score. What cannot be checked automatically (policies, training, contracts) is recorded
+as manual evidence with an expiry date. One click turns it all into a PDF report for
+management or auditors.
+
+[![CI](https://github.com/ilielucianno/1cyber-comply/actions/workflows/ci.yml/badge.svg)](https://github.com/ilielucianno/1cyber-comply/actions/workflows/ci.yml)
+![Licence](https://img.shields.io/badge/licence-Apache--2.0-blue)
+![Python](https://img.shields.io/badge/python-3.12-blue)
+
+![Dashboard](docs/screenshots/dashboard.png)
 
 ## Why
 
-Commercial compliance platforms cost five figures per year. NIS2 now requires thousands of
-mid-sized EU organisations to prove their cybersecurity measures. 1cyber Comply aims to do this
-for free, using tools many teams already run.
+NIS2 requires thousands of mid-sized EU organisations to prove their cybersecurity
+measures. Commercial compliance platforms typically cost five figures per year.
+1cyber Comply does the core of that job for free, on your own server, using tools many
+teams already have: **Wazuh** and **OPNsense**.
 
-## Roadmap
+## What it does
 
-| Stage | Scope | Status |
-|---|---|---|
-| 0 | Project foundation, database, web UI, Docker | done |
-| 1 | NIS2 Art. 21 control catalogue (41 controls) | done |
-| 2a | Wazuh collector (Server API + Indexer): 7 automated checks | done |
-| 2b | OPNsense collector: 6 automated checks | done |
-| 3 | Scheduled collection, compliance score and history | done |
-| 4 | Manual evidence upload, PDF reports | done |
-| 5 | Login, roles, CSRF protection, audit log, HTTPS | done |
-| 6 | One-line installer, .deb package, CI and releases | done |
+| | |
+|---|---|
+| **41 NIS2 controls** | Article 21(2)(a)–(j) and Article 23, each broken down into checks you can actually verify |
+| **14 automated checks** | Wazuh: agents, versions, CIS hardening (SCA), file integrity, inventory, alerts, vulnerabilities by host and package. OPNsense: firmware currency, active firewall ruleset, IDS/IPS, VPN, HTTPS admin, VLAN segmentation. Plus a check that monitoring itself keeps running |
+| **Manual evidence** | Pass/fail assessment, note, file, reviewer and validity date. Expired evidence turns red automatically |
+| **Compliance score** | Only proven controls count. History chart, collection every 24 h |
+| **PDF report** | Score, findings to fix, every control with its evidence, file hashes |
+| **Built for audits** | Roles (viewer / editor / admin), audit log of every action, evidence history per control |
+| **Read-only by design** | Never changes anything on your systems. Minimal privileges documented below |
+
+<table>
+<tr>
+<td><img src="docs/screenshots/controls.png" alt="Controls"></td>
+<td><img src="docs/screenshots/evidence.png" alt="Evidence"></td>
+<td><img src="docs/screenshots/report.png" alt="PDF report"></td>
+</tr>
+<tr>
+<td align="center">Controls with live evidence</td>
+<td align="center">Manual evidence and history</td>
+<td align="center">PDF report</td>
+</tr>
+</table>
 
 ## Install
 
-Requirements: Ubuntu or Debian with internet access. Docker is installed for you if missing.
+Requirements: Ubuntu or Debian, 1 GB RAM free, network access to Wazuh / OPNsense.
+Docker is installed for you if missing.
 
 **One-line installer** (install and upgrade):
 
@@ -35,7 +58,7 @@ curl -fsSL https://raw.githubusercontent.com/ilielucianno/1cyber-comply/main/get
 ```
 
 It installs into `/opt/1cyber-comply`, enables HTTPS with a self-signed certificate and keeps
-your `.env` and data on every upgrade. Read the script first; it is short.
+your settings and data on every upgrade. [Read the script](get.sh) first; it is short.
 
 **Debian package:** download the `.deb` from the latest
 [release](https://github.com/ilielucianno/1cyber-comply/releases), then:
@@ -54,10 +77,125 @@ git clone https://github.com/ilielucianno/1cyber-comply.git
 cd 1cyber-comply && ./install.sh
 ```
 
-Then open `https://<server>:8080` (or `http://127.0.0.1:8080` from source) and create the
-administrator account. Connection settings live in `/opt/1cyber-comply/.env`.
+Open `https://<server>:8080` and create the administrator account.
+Connection settings live in `/opt/1cyber-comply/.env`; after editing, apply them with
+`cd /opt/1cyber-comply && sudo docker compose up -d --force-recreate`.
 
-## Development (without Docker)
+**Just want to look around?** Fill a database with fictional demo data:
+
+```bash
+COMPLY_DATA_DIR=/tmp/comply-demo python scripts/seed_demo.py
+COMPLY_DATA_DIR=/tmp/comply-demo uvicorn app.main:app --port 8080   # log in: demo / Try-Comply-2026
+```
+
+## Connecting Wazuh
+
+Create a dedicated API user with the built-in `readonly` role and set in `.env`:
+
+```
+WAZUH_URL=https://wazuh.example.local:55000
+WAZUH_USER=comply
+WAZUH_PASSWORD=...
+```
+
+Alerts and vulnerabilities live in the Wazuh Indexer (Wazuh 4.8+). Add a second user with
+read access to `wazuh-alerts-*` and `wazuh-states-vulnerabilities-*` only:
+
+```
+WAZUH_INDEXER_URL=https://wazuh.example.local:9200
+WAZUH_INDEXER_USER=comply_ro
+WAZUH_INDEXER_PASSWORD=...
+```
+
+**Wazuh on the same machine (all-in-one install).** The Indexer usually listens only on
+`127.0.0.1`, which a container cannot reach. Enable host-network mode in `.env`:
+
+```
+COMPOSE_FILE=docker-compose.yml:docker-compose.hostnet.yml
+WAZUH_URL=https://127.0.0.1:55000
+WAZUH_INDEXER_URL=https://127.0.0.1:9200
+```
+
+## Connecting OPNsense
+
+OPNsense has no read-only API role, so 1cyber Comply only sends GET requests and asks for the
+smallest privilege set possible. Create a user **without** group membership and assign only:
+
+| Privilege | Used for |
+|---|---|
+| Lobby: Dashboard | installed version (firmware check) |
+| Diagnostics: Firewall Statistics | active pf ruleset, legacy and new rule engines |
+| Services: Intrusion Detection | IDS/IPS enabled and running |
+| VPN: WireGuard (Configuration, Status) | remote access VPN |
+| Interfaces: VLAN | network segmentation |
+
+Do **not** grant `System: Firmware`, `Diagnostics: Backup & Restore` or
+`Diagnostics: Configuration History`: they allow updates, full configuration download or restore.
+Firmware currency is checked against the latest public OPNsense release on GitHub instead
+(`OPNSENSE_CHECK_LATEST=false` on offline networks). Create the API key under
+System → Access → Users and set `OPNSENSE_URL`, `OPNSENSE_KEY`, `OPNSENSE_SECRET` in `.env`.
+
+## How the score works
+
+The score is the share of controls with **current passing evidence**. Failed, unknown,
+expired and not-yet-evidenced controls all count as not compliant, so the score never claims
+more than has been proven. A snapshot is stored after every collection; collection runs every
+`COLLECT_INTERVAL_HOURS` (default 24).
+
+The report states clearly that it supports, but does not replace, an assessment by the
+competent authority or an accredited auditor. It is not a certification.
+
+## Users and security
+
+| Role | Can |
+|---|---|
+| viewer | read everything, download reports and evidence files (management, auditors) |
+| editor | viewer + add evidence, run collections |
+| admin | editor + test connections, manage users, read the audit log |
+
+- Passwords hashed with scrypt, minimum 12 characters; one-time temporary passwords for new users
+- Server-side sessions, revoked on logout, password change or when a user is disabled
+- Lockout after 5 failed logins; CSRF protection on every change; SameSite=Strict cookies; strict CSP
+- Uploaded files stored under random names and only served as downloads; SHA-256 recorded
+- Evidence always attributed to the logged-in user; logins, uploads, collections and user changes audited
+
+Expose the app beyond `127.0.0.1` only with HTTPS on (`COMPLY_TLS=true`, the installer default):
+change the port binding in `docker-compose.yml` from `127.0.0.1:8080:8080` to `8080:8080`.
+
+**Locked out?**
+```bash
+sudo docker exec -it 1cyber-comply python -m app.cli reset-password <username>
+```
+
+Report vulnerabilities privately: see [SECURITY.md](SECURITY.md).
+
+## Configuration
+
+All settings are environment variables in `.env`; see [.env.example](.env.example) for the full
+list with comments (thresholds, collection interval, HTTPS, session and lockout settings,
+organisation name on reports).
+
+## Architecture
+
+```
+app/
+  main.py            routes and UI
+  guard.py           login, roles and CSRF on every request
+  auth.py            users, scrypt, sessions, lockout, audit log
+  collectors/        wazuh.py, opnsense.py, comply.py - one module per source
+  evidence.py        stores results as evidence on controls
+  scoring.py         compliance score, history, chart
+  manual.py          manual evidence and file uploads
+  report.py          PDF report (ReportLab)
+  scheduler.py       automatic collection
+controls/nis2.yaml   control catalogue - add a framework by adding a YAML file
+tests/               78 tests, Wazuh and OPNsense simulated, no network needed
+```
+
+Stack: Python 3.12, FastAPI, SQLite, Jinja2, ReportLab, Docker. All dependencies use
+permissive licences (MIT, BSD, Apache-2.0); nothing requires a commercial licence.
+
+## Development
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -66,117 +204,15 @@ pytest -q
 uvicorn app.main:app --reload --port 8080
 ```
 
-## Users and security
+See [CONTRIBUTING.md](CONTRIBUTING.md). Ideas on the roadmap: ISO 27001 and DORA catalogues,
+Microsoft 365 / Entra ID and Proxmox collectors, evidence reminders by email.
 
-On first start, open the app and create the administrator account (the setup page closes
-once an account exists). Then add people under **Users**:
+## Support and services
 
-| Role | Can |
-|---|---|
-| viewer | read everything, download reports and evidence files (management, auditors) |
-| editor | viewer + add evidence, run collections |
-| admin | editor + test connections, manage users, read the audit log |
-
-- Passwords: scrypt hashes, min. 12 characters; new users get a one-time temporary password
-- Sessions: server-side, revoked on logout, password change or when a user is disabled
-- Lockout after 5 failed logins for 15 minutes; same error for unknown users
-- CSRF token on every state-changing request, SameSite=Strict cookies, strict security headers
-- Evidence is always attributed to the logged-in user; every login, evidence upload, collection
-  and user change is written to the **Audit log**
-
-**HTTPS:** set `COMPLY_TLS=true` (self-signed certificate generated on first start, or provide
-your own in `/data/tls`). To reach the app from other machines, change the port binding in
-`docker-compose.yml` from `127.0.0.1:8080:8080` to `8080:8080` only after enabling HTTPS.
-
-**Locked out?**
-```bash
-docker exec -it 1cyber-comply python -m app.cli reset-password <username>
-```
-
-## Compliance score
-
-The score is the share of a framework's controls with **passing** evidence. Failed, unknown
-and not-yet-evidenced controls all count as not passing, so the score never claims more
-than has been proven. The dashboard shows the overall score, the automated-controls score
-and a history chart; a snapshot is stored after every collection.
-
-Collection runs automatically every `COLLECT_INTERVAL_HOURS` (default 24, `0` disables it).
-The internal check `nis2-f-03` passes only while automatic collection keeps running.
-
-## Manual evidence and reports
-
-Open any manual control and add evidence: a pass/fail assessment, a note, the reviewer's
-name, a validity date (default one year) and optionally a file (PDF, images, Office/ODF
-documents, text; max 10 MB). Expired evidence automatically counts as failed, so annual
-reviews cannot be silently skipped. Every piece of evidence is kept as an audit trail.
-
-Uploaded files are stored under random names and only ever served as downloads, never
-rendered in the browser. Their SHA-256 hash is listed in the report.
-
-**PDF report:** *Download PDF report* on the dashboard or controls page. It contains the
-score and history, findings to address, every control with its current evidence, an
-appendix of evidence files with hashes, and a statement that it supports but does not
-replace an assessment by the authority or an accredited auditor. Set `ORG_NAME` in `.env`.
-
-## Connecting Wazuh
-
-Create a dedicated read-only API user (role `readonly`) and set in `.env`:
-
-```
-WAZUH_URL=https://host.docker.internal:55000
-WAZUH_USER=comply
-WAZUH_PASSWORD=...
-```
-
-Alerts and vulnerabilities live in the Wazuh Indexer (Wazuh 4.8+). Optionally add a
-read-only indexer user with `WAZUH_INDEXER_URL`, `WAZUH_INDEXER_USER`, `WAZUH_INDEXER_PASSWORD`.
-
-**Wazuh on the same machine (all-in-one install).** The Wazuh Indexer usually listens only on
-`127.0.0.1`, which a container cannot reach. Enable host-network mode by adding to `.env`:
-
-```
-COMPOSE_FILE=docker-compose.yml:docker-compose.hostnet.yml
-WAZUH_URL=https://127.0.0.1:55000
-WAZUH_INDEXER_URL=https://127.0.0.1:9200
-```
-
-The web UI still listens on 127.0.0.1 only.
-
-
-## Connecting OPNsense
-
-OPNsense has no read-only API role, so 1cyber Comply only sends GET requests and needs the
-smallest privilege set possible. Create a user **without** group membership, assign only:
-
-| Privilege | Used for |
-|---|---|
-| Lobby: Dashboard | installed version (firmware check) |
-| Diagnostics: Firewall Statistics | active pf ruleset, works for legacy and new rules |
-| Firewall: Rules New | optional, rules created in the new rule engine |
-| Services: Intrusion Detection | IDS/IPS enabled and running |
-| VPN: WireGuard (Configuration, Status) | remote access VPN |
-| Interfaces: VLAN | network segmentation |
-
-Do **not** grant `System: Firmware`, `Diagnostics: Backup & Restore` or
-`Diagnostics: Configuration History`: they allow updates, full config download or restore.
-Firmware currency is checked by comparing the installed version with the latest public
-OPNsense release on GitHub (disable with `OPNSENSE_CHECK_LATEST=false` on offline networks).
-Create the API key from System > Access > Users and set `OPNSENSE_URL`, `OPNSENSE_KEY`,
-`OPNSENSE_SECRET` in `.env`.
-
-## Architecture
-
-```
-app/
-  main.py          FastAPI app, routes
-  config.py        settings from environment (.env)
-  db.py            SQLite schema: frameworks, controls, evidence
-  collectors/      one module per data source (Wazuh, OPNsense, ...)
-  templates/       web UI
-controls/          control catalogues (YAML), one file per framework
-tests/
-```
+1cyber Comply is free and open source. Installation, configuration, NIS2 gap assessments and
+custom collectors are available as professional services from [1cyber.eu](https://1cyber.eu).
 
 ## Licence
 
-Apache License 2.0
+[Apache License 2.0](LICENSE). The NIS2 control descriptions are original wording based on
+Directive (EU) 2022/2555, which may be reused freely under Commission Decision 2011/833/EU.
