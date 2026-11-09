@@ -7,7 +7,10 @@
 {% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
 
 <h1 style="font-size:22px;margin:0 0 4px">{{ cat.name }}</h1>
-<p class="muted" style="margin:0 0 16px">{{ cat.authority }} · {{ cat.reference }} · target level {{ cat.target_level }} on every measure</p>
+<div style="display:flex;justify-content:space-between;gap:12px;align-items:flex-start;flex-wrap:wrap;margin:0 0 16px">
+  <p class="muted" style="margin:0">{{ cat.authority }} · {{ cat.reference }} · target level {{ cat.target_level }} on every measure</p>
+  <a class="btn" href="/reports/maturity/{{ cat.id }}.pdf">Download PDF report</a>
+</div>
 
 <div class="card" style="margin-bottom:8px">
   <div class="score">

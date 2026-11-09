@@ -38,7 +38,8 @@
       <div>Average level {{ ms.avg_level }} · lowest level {{ ms.min_level }}</div>
       <div>{{ ms.requirements_answered }} of {{ ms.requirements_total }} requirements assessed</div>
     </div>
-    <div style="margin-left:auto"><a class="btn" href="/maturity/{{ ms.framework_id }}">Open assessment</a></div>
+    <div style="margin-left:auto;display:flex;gap:8px"><a class="btn" href="/maturity/{{ ms.framework_id }}">Open assessment</a>
+      <a class="btn" href="/reports/maturity/{{ ms.framework_id }}.pdf">PDF report</a></div>
   </div>
 </div>
 {% endfor %}

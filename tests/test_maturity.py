@@ -426,3 +426,34 @@ def test_evidence_in_ui_and_api(ev_client):
     with LoggedInClient(app, role="viewer") as viewer:
         assert viewer.post(f"/maturity/{FW}/apply-evidence", data={}).status_code == 403
         assert "Apply evidence suggestions" not in viewer.get(f"/maturity/{FW}/SS1").text
+
+
+# ---------- PDF report ----------
+
+def _pdf_text(content: bytes) -> str:
+    pdfplumber = pytest.importorskip("pdfplumber")
+    import io
+    with pdfplumber.open(io.BytesIO(content)) as pdf:
+        return "\n".join(p.extract_text() or "" for p in pdf.pages)
+
+
+def test_maturity_pdf_report(ev_client):
+    maturity.save_answer(FW, "STR1", "1.1", "met", "", "alice")
+    maturity.save_answer(FW, "STR1", "1.2", "met", "", "alice")
+    maturity.save_answer(FW, "STR1", "1.3", "not_met", "Strategy not written", "alice")
+    maturity.save_answer(FW, "HRS6", "5.4", "na", "No cloud services are used", "alice")
+    evidence.save_results("wazuh", [CheckResult("sca", "fail", "2 agents below 70%")])
+    maturity.save_answer(FW, "SS2", "5.7", "met", "", "alice")
+    r = ev_client.get(f"/reports/maturity/{FW}.pdf")
+    assert r.status_code == 200 and r.content.startswith(b"%PDF")
+    assert f"{FW}-maturity-report-" in r.headers["content-disposition"]
+    text = " ".join(_pdf_text(r.content).split())
+    assert "NOT MATURE: 70 of 70 measures are below level 3" in text
+    assert "Remediation plan to reach level 3" in text
+    assert "P1 · STR1 Information security strategy · level 0 → 3" in text
+    assert "1.3 (not met)" in text and "Strategy not written" in text
+    assert "Cloud: requirements marked not applicable" in text and "No cloud services are used" in text
+    assert "SS2 5.7" in text and "wazuh:sca: fail" in text           # evidence conflict
+    assert "Appendix: assessment record" in text
+    assert ev_client.get("/reports/maturity/nope.pdf").status_code == 404
+    assert "/reports/maturity/" in ev_client.get(f"/maturity/{FW}").text

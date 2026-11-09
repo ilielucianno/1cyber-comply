@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from app import auth, auth_routes, catalog, config, evidence, manual, maturity, report, scoring
+from app import auth, auth_routes, catalog, config, evidence, manual, maturity, maturity_report, report, scoring
 from app.guard import client_ip, guard
 from app.scheduler import run_all, scheduler
 from app.db import get_conn, init_db
@@ -477,6 +477,15 @@ def download_attachment(attachment_id: int):
     # Always a download, never rendered inline: uploaded files cannot run in the app's origin.
     return FileResponse(path, media_type="application/octet-stream", filename=meta["filename"],
                         headers={"X-Content-Type-Options": "nosniff"})
+
+
+@app.get("/reports/maturity/{framework_id}.pdf")
+def maturity_pdf_report(framework_id: str):
+    _maturity(framework_id)
+    pdf = maturity_report.build_pdf(framework_id)
+    name = f"{framework_id}-maturity-report-{date.today().isoformat()}.pdf"
+    return Response(pdf, media_type="application/pdf",
+                    headers={"Content-Disposition": f'attachment; filename="{name}"'})
 
 
 @app.get("/reports/{framework_id}.pdf")

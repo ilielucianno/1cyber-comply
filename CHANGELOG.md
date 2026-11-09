@@ -31,6 +31,12 @@
   that the current evidence contradicts are reported as conflicts.
 - Automated evidence now records the collector check name (`evidence.check_name`); older
   rows are matched through the control's automation field.
+- Maturity PDF report (`/reports/maturity/{id}.pdf`, buttons on the Maturity page and the
+  dashboard): summary and verdict, measures per level, maturity by category, result per
+  measure with its blocking requirement, a remediation plan to reach the target level
+  (lowest level first, P1-P3, every open requirement up to the target with its status and
+  note, owner and due date columns), the Cloud not-applicable section, automated evidence
+  conflicts, the assessment record and a statement of what the report does not prove.
 - API: `GET /api/maturity/{id}/evidence`, `POST /api/maturity/{id}/evidence/apply`.
 - API: `GET /api/maturity`, `GET /api/maturity/{id}`,
   `GET /api/maturity/{id}/measures/{measure}`, `POST /api/maturity/{id}/answers`.
