@@ -45,6 +45,18 @@
   <div class="muted" style="font-size:13px;margin-top:10px">Level 0: {{ m.level0 }}</div>
 </div>
 
+{% if pending and can_edit %}
+<div class="card" style="margin-top:16px;display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+  <span>Automated evidence suggests an answer for {{ pending|length }} unanswered requirement(s):
+    {% for p in pending %}<a href="#r-{{ p.requirement_id }}">{{ p.requirement_id }}</a> ({{ p.suggestion|replace('_', ' ') }}){{ ', ' if not loop.last }}{% endfor %}</span>
+  <form method="post" action="/maturity/{{ cat.id }}/apply-evidence">
+    <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
+    <input type="hidden" name="measure_id" value="{{ m.id }}">
+    <button type="submit">Apply evidence suggestions</button>
+  </form>
+</div>
+{% endif %}
+
 <form method="post" action="/maturity/{{ cat.id }}/{{ m.id }}" style="display:block">
   <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
   {% for level in [1, 2, 3, 4, 5] %}
@@ -66,6 +78,26 @@
         <input type="text" name="n:{{ r.id }}" value="{{ r.note or '' }}" maxlength="4000" {{ 'disabled' if not can_edit }}
                placeholder="{{ 'Justification (required for not applicable)' if r.na_section else 'Note: evidence, document, gap' }}">
       </div>
+      {% set e = ev.get(r.id) %}
+      {% if e %}
+      <div class="evidence" style="border-left:3px solid {{ '#f85149' if e.signal == 'contradicts' else ('#3fb950' if e.signal == 'supports' else '#8a939d') }}">
+        <div><strong>Automated evidence</strong> · {{ e.coverage }} coverage ·
+          {% if e.signal == 'supports' %}<span class="ok">supports this requirement{{ '' if e.coverage == 'full' else ' (partly)' }}</span>
+          {% elif e.signal == 'contradicts' %}<span style="color:#f85149">contradicts this requirement</span>
+          {% else %}<span class="muted">no current result</span>{% endif %}
+          {% if e.suggestion and not r.answer %} · suggests <strong>{{ e.suggestion|replace('_', ' ') }}</strong>{% endif %}
+          {% if e.conflict %} · <strong style="color:#f85149">conflicts with the saved answer</strong>{% endif %}
+        </div>
+        <div class="muted" style="margin-top:2px">{{ e.why }}</div>
+        {% for c in e.checks %}
+        <div style="margin-top:4px"><code>{{ c.check }}</code>
+          {% if c.status %}<span class="st {{ c.status }}">{{ c.status }}</span> {{ c.summary }}
+            <span class="muted">· {{ c.collected_at }} UTC{% if c.state == 'stale' %} · stale (older than {{ e.max_age_hours|int }} h){% endif %}</span>
+          {% else %}<span class="muted">not collected yet</span>{% endif %}
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
       {% if r.answered_at %}<div class="muted" style="font-size:12px;margin-top:4px">{{ r.answered_by }} · {{ r.answered_at }} UTC</div>
       {% else %}<div class="muted" style="font-size:12px;margin-top:4px">Not assessed</div>{% endif %}
     </div>

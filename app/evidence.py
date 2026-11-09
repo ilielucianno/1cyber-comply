@@ -29,8 +29,9 @@ def save_results(source: str, results: list[CheckResult]) -> int:
                 log.info("Check %s:%s is not linked to any control", source, r.check)
             for cid in control_ids:
                 conn.execute(
-                    "INSERT INTO evidence (control_id, source, status, summary, raw_json) VALUES (?, ?, ?, ?, ?)",
-                    (cid, source, r.status, r.summary, json.dumps(r.raw, ensure_ascii=False, default=str)),
+                    """INSERT INTO evidence (control_id, source, status, summary, raw_json, check_name)
+                       VALUES (?, ?, ?, ?, ?, ?)""",
+                    (cid, source, r.status, r.summary, json.dumps(r.raw, ensure_ascii=False, default=str), r.check),
                 )
                 saved += 1
     return saved

@@ -188,6 +188,28 @@ def api_maturity_measure(framework_id: str, measure_id: str):
             "history": maturity.answer_history(framework_id, measure_id)}
 
 
+@app.get("/api/maturity/{framework_id}/evidence")
+def api_maturity_evidence(framework_id: str):
+    _maturity(framework_id)
+    r = maturity.evidence_review(framework_id)
+    return {"mapped": [{"measure_id": k[0], "requirement_id": k[1], **v} for k, v in r["evidence"].items()],
+            "pending": r["pending"], "conflicts": r["conflicts"]}
+
+
+@app.post("/api/maturity/{framework_id}/evidence/apply")
+def api_maturity_apply(request: Request, framework_id: str, measure_id: str | None = None):
+    """Save evidence suggestions for unanswered requirements (never overwrites a person's answer)."""
+    cat = _maturity(framework_id)
+    if measure_id and not cat.measure(measure_id):
+        raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
+    who = _who(request)
+    saved = maturity.apply_suggestions(framework_id, who, measure_id)
+    if saved:
+        auth.audit("maturity.evidence", who, f"{framework_id}: {saved} suggestion(s) applied", client_ip(request))
+        maturity.snapshot(framework_id)
+    return {"saved": saved}
+
+
 @app.post("/api/maturity/{framework_id}/answers")
 async def api_maturity_answer(request: Request, framework_id: str):
     """Body: {"measure_id", "requirement_id", "answer": met|not_met|na, "note"} or a list of them."""
@@ -351,13 +373,34 @@ def maturity_measure_page(request: Request, framework_id: str, measure_id: str,
         raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
     answers = maturity.latest_answers(framework_id)
     idx = cat.measures.index(m)
-    return _ui(request, "maturity_measure.html", "maturity", cat=cat, m=m,
+    review = maturity.evidence_review(framework_id, answers)
+    ev = {k[1]: v for k, v in review["evidence"].items() if k[0] == m.id}
+    return _ui(request, "maturity_measure.html", "maturity", cat=cat, m=m, ev=ev,
+               pending=[p for p in review["pending"] if p["measure_id"] == m.id],
                s=maturity.score_measure(m, answers, cat.target_level),
                reqs=[maturity.req_view(r, answers.get((m.id, r.id))) for r in m.requirements],
                history=maturity.answer_history(framework_id, measure_id)[:50],
                prev=cat.measures[idx - 1] if idx > 0 else None,
                next=cat.measures[idx + 1] if idx + 1 < len(cat.measures) else None,
                flash=msg, flash_ok=bool(ok))
+
+
+@app.post("/maturity/{framework_id}/apply-evidence")
+async def maturity_apply_evidence(request: Request, framework_id: str):
+    cat = _maturity(framework_id)
+    form = await request.form()
+    measure_id = str(form.get("measure_id") or "") or None
+    if measure_id and not cat.measure(measure_id):
+        raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
+    who = _who(request)
+    saved = maturity.apply_suggestions(framework_id, who, measure_id)
+    if saved:
+        auth.audit("maturity.evidence", who, f"{framework_id}: {saved} suggestion(s) applied", client_ip(request))
+        maturity.snapshot(framework_id)
+    back = f"/maturity/{framework_id}" + (f"/{measure_id}" if measure_id else "")
+    msg = (f"{saved} answer(s) saved from automated evidence. Review them before the assessment is final."
+           if saved else "No evidence suggestions to apply.")
+    return RedirectResponse(f"{back}?ok=1&msg={quote(msg)}", status_code=303)
 
 
 @app.post("/maturity/{framework_id}/{measure_id}")

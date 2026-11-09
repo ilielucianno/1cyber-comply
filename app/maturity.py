@@ -19,8 +19,15 @@ Scoring rule (cumulative, "first failure caps the level"):
 
 Catalogues live in controls/maturity/*.yaml and are kept in memory; the
 answers live in the database with full history (the latest answer wins).
+
+Automated evidence (controls/maturity/evidence/*.yaml) links collector checks to
+requirements. It never answers by itself: it suggests an answer for a person to
+accept and flags answers that the current evidence contradicts. A "partial"
+mapping can only contradict; a "full" one can also suggest "met".
 """
 import logging
+import re
+from datetime import datetime, timezone
 from dataclasses import dataclass, field
 from pathlib import Path
 
@@ -32,6 +39,10 @@ from app.db import get_conn
 log = logging.getLogger("comply.maturity")
 
 MATURITY_DIR = CONTROLS_DIR / "maturity"
+EVIDENCE_DIR = MATURITY_DIR / "evidence"
+EVIDENCE_SOURCES = ("wazuh", "opnsense", "microsoft365", "comply")
+_CHECK_RE = re.compile(r"^([a-z0-9]+):([a-z0-9_]+)$")
+DEFAULT_MAX_AGE_HOURS = 72
 ANSWERS = ("met", "not_met", "na")
 LEVELS = (1, 2, 3, 4, 5)
 
@@ -86,7 +97,19 @@ class Catalogue:
         return sum(len(m.requirements) for m in self.measures)
 
 
+@dataclass
+class EvidenceMapping:
+    measure_id: str
+    requirement_id: str
+    checks: list[tuple[str, str]]      # (source, check)
+    signal: str                        # pass | ran
+    coverage: str                      # full | partial
+    why: str
+
+
 _catalogues: dict[str, Catalogue] = {}
+_mappings: dict[str, list[EvidenceMapping]] = {}
+_max_age: dict[str, float] = {}
 
 
 # ---------- loading ----------
@@ -163,6 +186,43 @@ def parse(data: dict, source: str) -> Catalogue:
                      na_sections=na_sections)
 
 
+def parse_mappings(data: dict, source: str, cats: dict[str, Catalogue]) -> tuple[str, float, list[EvidenceMapping]]:
+    fw = data.get("framework")
+    cat = cats.get(fw)
+    if not cat:
+        raise MaturityCatalogError(f"{source}: unknown maturity framework '{fw}'")
+    max_age = float(data.get("max_age_hours", DEFAULT_MAX_AGE_HOURS))
+    if max_age <= 0:
+        raise MaturityCatalogError(f"{source}: max_age_hours must be positive")
+    out: list[EvidenceMapping] = []
+    seen: set[tuple[str, str]] = set()
+    for i, m in enumerate(data.get("mappings") or [], 1):
+        mid, rid = str(m.get("measure", "")), str(m.get("requirement", ""))
+        measure = cat.measure(mid)
+        if not measure or not measure.requirement(rid):
+            raise MaturityCatalogError(f"{source}: mapping {i} refers to unknown requirement {mid} {rid}")
+        if (mid, rid) in seen:
+            raise MaturityCatalogError(f"{source}: requirement {mid} {rid} is mapped twice")
+        seen.add((mid, rid))
+        checks = []
+        for c in m.get("checks") or []:
+            match = _CHECK_RE.match(str(c))
+            if not match or match.group(1) not in EVIDENCE_SOURCES:
+                raise MaturityCatalogError(f"{source}: {mid} {rid} has invalid check '{c}'")
+            checks.append((match.group(1), match.group(2)))
+        if not checks:
+            raise MaturityCatalogError(f"{source}: {mid} {rid} has no checks")
+        signal, coverage = m.get("signal", "pass"), m.get("coverage", "partial")
+        if signal not in ("pass", "ran"):
+            raise MaturityCatalogError(f"{source}: {mid} {rid} signal must be pass or ran")
+        if coverage not in ("full", "partial"):
+            raise MaturityCatalogError(f"{source}: {mid} {rid} coverage must be full or partial")
+        if not str(m.get("why") or "").strip():
+            raise MaturityCatalogError(f"{source}: {mid} {rid} needs a 'why'")
+        out.append(EvidenceMapping(mid, rid, checks, signal, coverage, " ".join(str(m["why"]).split())))
+    return fw, max_age, out
+
+
 def load_all(directory: Path = MATURITY_DIR) -> dict[str, int]:
     """Load every maturity catalogue; a broken file stops start-up with a clear message."""
     loaded: dict[str, Catalogue] = {}
@@ -173,8 +233,21 @@ def load_all(directory: Path = MATURITY_DIR) -> dict[str, int]:
         loaded[cat.id] = cat
         log.info("Maturity catalogue %s: %d measures, %d requirements from %s",
                  cat.id, len(cat.measures), cat.requirement_count, path.name)
+    mappings: dict[str, list[EvidenceMapping]] = {}
+    max_age: dict[str, float] = {}
+    ev_dir = directory / "evidence"
+    for path in sorted(ev_dir.glob("*.yaml")) if ev_dir.is_dir() else []:
+        fw, age, items = parse_mappings(yaml.safe_load(path.read_text(encoding="utf-8")) or {}, path.name, loaded)
+        if fw in mappings:
+            raise MaturityCatalogError(f"{path.name}: evidence for {fw} is already loaded from another file")
+        mappings[fw], max_age[fw] = items, age
+        log.info("Maturity evidence %s: %d mapped requirements from %s", fw, len(items), path.name)
     _catalogues.clear()
     _catalogues.update(loaded)
+    _mappings.clear()
+    _mappings.update(mappings)
+    _max_age.clear()
+    _max_age.update(max_age)
     return {k: len(v.measures) for k, v in loaded.items()}
 
 
@@ -293,6 +366,11 @@ def compute(framework_id: str) -> dict:
         raise KeyError(f"Maturity framework '{framework_id}' does not exist")
     answers = latest_answers(framework_id)
     measures = [score_measure(m, answers, cat.target_level) for m in cat.measures]
+    review = evidence_review(framework_id, answers)
+    for s in measures:
+        s["evidence_conflicts"] = sum(1 for c in review["conflicts"] if c["measure_id"] == s["id"])
+        s["evidence_pending"] = sum(1 for p in review["pending"] if p["measure_id"] == s["id"])
+        s["evidence_mapped"] = sum(1 for k in review["evidence"] if k[0] == s["id"])
 
     categories: dict[str, dict] = {}
     for s in measures:
@@ -325,6 +403,9 @@ def compute(framework_id: str) -> dict:
                        for s in measures for r in s["not_applicable"] if r["na_section"] == sec]}
             for sec, info in cat.na_sections.items()],
         "categories": list(categories.values()),
+        "evidence_mapped": len(review["evidence"]),
+        "evidence_conflicts": review["conflicts"],
+        "evidence_pending": review["pending"],
     }
 
 
@@ -358,3 +439,107 @@ def history(framework_id: str, limit: int = 90) -> list[dict]:
             """SELECT * FROM (SELECT * FROM maturity_history WHERE framework_id = ?
                               ORDER BY id DESC LIMIT ?) ORDER BY id""", (framework_id, limit)).fetchall()
     return [dict(r) for r in rows]
+
+
+# ---------- automated evidence ----------
+
+def mappings(framework_id: str) -> list[EvidenceMapping]:
+    return list(_mappings.get(framework_id, []))
+
+
+def _latest_check(conn, source: str, check: str) -> dict | None:
+    """Newest automated result of one collector check (older rows have no check_name and
+    are matched through the control's automation field)."""
+    row = conn.execute(
+        """SELECT e.id, e.status, e.summary, e.collected_at FROM evidence e
+           JOIN controls c ON c.id = e.control_id
+           WHERE e.source = ? AND (e.check_name = ? OR (e.check_name IS NULL
+                 AND ',' || c.automation || ',' LIKE ?))
+           ORDER BY e.id DESC LIMIT 1""", (source, check, f"%,{source}:{check},%")).fetchone()
+    return dict(row) if row else None
+
+
+def _age_hours(ts: str, now: datetime) -> float:
+    t = datetime.strptime(ts, "%Y-%m-%d %H:%M:%S").replace(tzinfo=timezone.utc)
+    return (now - t).total_seconds() / 3600
+
+
+def evidence_status(framework_id: str, now: datetime | None = None) -> dict[tuple[str, str], dict]:
+    """{(measure_id, requirement_id): evidence view} for every mapped requirement.
+
+    signal: supports | contradicts | incomplete
+    suggestion: met | not_met | None
+    """
+    now = now or datetime.now(timezone.utc)
+    max_age = _max_age.get(framework_id, DEFAULT_MAX_AGE_HOURS)
+    out = {}
+    with get_conn() as conn:
+        cache: dict[tuple[str, str], dict | None] = {}
+        for mp in _mappings.get(framework_id, []):
+            checks = []
+            for src, chk in mp.checks:
+                if (src, chk) not in cache:
+                    cache[(src, chk)] = _latest_check(conn, src, chk)
+                e = cache[(src, chk)]
+                if not e:
+                    state = "missing"
+                elif _age_hours(e["collected_at"], now) > max_age:
+                    state = "stale"
+                elif e["status"] == "unknown":
+                    state = "unknown"
+                elif mp.signal == "ran" or e["status"] == "pass":
+                    state = "supports"
+                else:
+                    state = "contradicts"
+                checks.append({"check": f"{src}:{chk}", "state": state,
+                               "status": e["status"] if e else None, "summary": e["summary"] if e else None,
+                               "collected_at": e["collected_at"] if e else None,
+                               "evidence_id": e["id"] if e else None})
+            states = {c["state"] for c in checks}
+            if "contradicts" in states:
+                signal, suggestion = "contradicts", "not_met"
+            elif states == {"supports"}:
+                signal = "supports"
+                suggestion = "met" if mp.coverage == "full" else None
+            else:
+                signal, suggestion = "incomplete", None
+            out[(mp.measure_id, mp.requirement_id)] = {
+                "signal": signal, "suggestion": suggestion, "coverage": mp.coverage,
+                "why": mp.why, "checks": checks, "max_age_hours": max_age}
+    return out
+
+
+def evidence_review(framework_id: str, answers: dict | None = None, now: datetime | None = None) -> dict:
+    """Combine evidence with the answers: pending suggestions and conflicts per requirement."""
+    answers = latest_answers(framework_id) if answers is None else answers
+    ev = evidence_status(framework_id, now)
+    pending, conflicts = [], []
+    for key, e in ev.items():
+        a = answers.get(key)
+        conflict = bool(a) and ((a["answer"] in ("met", "na") and e["signal"] == "contradicts")
+                                or (a["answer"] == "not_met" and e["suggestion"] == "met"))
+        e["conflict"] = conflict
+        item = {"measure_id": key[0], "requirement_id": key[1], **e, "answer": a["answer"] if a else None}
+        if conflict:
+            conflicts.append(item)
+        elif not a and e["suggestion"]:
+            pending.append(item)
+    return {"evidence": ev, "pending": pending, "conflicts": conflicts}
+
+
+def apply_suggestions(framework_id: str, answered_by: str, measure_id: str | None = None,
+                      now: datetime | None = None) -> int:
+    """Save the evidence suggestion for every requirement that has no answer yet.
+    Answers given by a person are never overwritten."""
+    review = evidence_review(framework_id, now=now)
+    saved = 0
+    for p in review["pending"]:
+        if measure_id and p["measure_id"] != measure_id:
+            continue
+        used = [c for c in p["checks"] if c["evidence_id"]]
+        note = "Automated evidence: " + "; ".join(
+            f"{c['check']} {c['status']} ({c['collected_at']} UTC): {c['summary']}" for c in used)
+        save_answer(framework_id, p["measure_id"], p["requirement_id"], p["suggestion"],
+                    note[:4000], answered_by, used[0]["evidence_id"] if used else None)
+        saved += 1
+    return saved

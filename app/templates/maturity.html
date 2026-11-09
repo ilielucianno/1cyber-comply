@@ -32,6 +32,31 @@
     {% for level, count in s.distribution.items() %}<i style="background:{{ colors[level] }};height:8px;width:8px;border-radius:2px"></i>level {{ level }}: {{ count }}{% endfor %}
   </div>
 </div>
+{% if s.evidence_mapped %}
+<div class="card" style="margin:16px 0 8px">
+  <div style="display:flex;justify-content:space-between;gap:12px;align-items:center;flex-wrap:wrap">
+    <span>Automated evidence is linked to {{ s.evidence_mapped }} requirements.
+      {% if s.evidence_pending %}<strong>{{ s.evidence_pending|length }}</strong> unanswered requirement(s) have a suggested answer.{% endif %}
+      {% if s.evidence_conflicts %}<strong style="color:#f85149">{{ s.evidence_conflicts|length }} saved answer(s) conflict with current evidence.</strong>{% endif %}
+      {% if not s.evidence_pending and not s.evidence_conflicts %}<span class="muted">Nothing to review.</span>{% endif %}
+    </span>
+    {% if s.evidence_pending and request.state.user.role in ('admin', 'editor') %}
+    <form method="post" action="/maturity/{{ cat.id }}/apply-evidence">
+      <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
+      <button type="submit">Apply all evidence suggestions</button>
+    </form>
+    {% endif %}
+  </div>
+  {% for c in s.evidence_conflicts %}
+  <div class="row" style="font-size:13px">
+    <span><a href="/maturity/{{ cat.id }}/{{ c.measure_id }}#r-{{ c.requirement_id }}"><code style="color:inherit">{{ c.measure_id }} {{ c.requirement_id }}</code></a>
+      answered <strong>{{ c.answer|replace('_', ' ') }}</strong>, evidence {{ 'contradicts it' if c.signal == 'contradicts' else 'suggests met' }}</span>
+    <span class="muted">{{ c.checks | map(attribute='check') | join(', ') }}</span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+
 <p class="muted" style="font-size:13px">Levels are cumulative: a measure reaches a level only when every requirement of that level and of
   all levels below it is met. The first unmet requirement blocks the measure. Unassessed requirements count as not met.</p>
 
@@ -49,6 +74,8 @@
   <div class="row">
     <span>{{ lv(x.level) }} <a href="/maturity/{{ cat.id }}/{{ x.id }}"><code style="color:inherit">{{ x.id }}</code> {{ x.title }}</a></span>
     <span class="muted" style="font-size:13px;text-align:right">
+      {% if x.evidence_conflicts %}<strong style="color:#f85149">{{ x.evidence_conflicts }} evidence conflict(s)</strong> · {% endif %}
+      {% if x.evidence_pending %}{{ x.evidence_pending }} suggestion(s) · {% endif %}
       {% if x.blocking %}blocked by {{ x.blocking.id }} ({{ 'not met' if x.blocking.reason == 'not_met' else 'not assessed' }}) · {% endif %}
       {{ x.answered }}/{{ x.total }} assessed
     </span>

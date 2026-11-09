@@ -316,3 +316,113 @@ def test_viewer_sees_read_only_form(client):
         page = viewer.get(f"/maturity/{FW}/STR1").text
         assert "disabled" in page and "Save and go to" not in page
         assert viewer.post(f"/maturity/{FW}/STR1", data={"a:1.1": "met"}).status_code == 403
+
+
+# ---------- automated evidence ----------
+
+from datetime import datetime, timedelta, timezone  # noqa: E402
+
+from app import evidence  # noqa: E402
+from app.collectors.base import CheckResult  # noqa: E402
+
+
+@pytest.fixture
+def ev_client(client):
+    with get_conn() as conn:
+        conn.execute("DELETE FROM attachments")
+        conn.execute("DELETE FROM evidence")
+    yield client
+
+
+def test_every_mapped_check_is_a_real_collector_check():
+    maturity.load_all()
+    nis2 = yaml.safe_load(open(maturity.CONTROLS_DIR / "nis2.yaml"))
+    known = {a.strip() for cat in nis2["categories"] for c in cat["controls"]
+             for a in str(c.get("automation") or "").split(",") if a.strip()}
+    maps = maturity.mappings(FW)
+    assert len(maps) >= 20
+    for mp in maps:
+        for src, chk in mp.checks:
+            assert f"{src}:{chk}" in known, (mp.measure_id, mp.requirement_id, src, chk)
+
+
+@pytest.mark.parametrize("entry, message", [
+    ({"measure": "NOPE1", "requirement": "1.1", "checks": ["wazuh:fim"], "why": "x"}, "unknown requirement"),
+    ({"measure": "SS1", "requirement": "5.2", "checks": ["foo:fim"], "why": "x"}, "invalid check"),
+    ({"measure": "SS1", "requirement": "5.2", "checks": [], "why": "x"}, "no checks"),
+    ({"measure": "SS1", "requirement": "5.2", "checks": ["wazuh:fim"], "coverage": "most", "why": "x"}, "coverage"),
+    ({"measure": "SS1", "requirement": "5.2", "checks": ["wazuh:fim"]}, "why"),
+])
+def test_invalid_evidence_mapping_is_rejected(entry, message):
+    maturity.load_all()
+    cats = {FW: maturity.get(FW)}
+    with pytest.raises(maturity.MaturityCatalogError, match=message):
+        maturity.parse_mappings({"framework": FW, "mappings": [entry]}, "bad.yaml", cats)
+    dup = {"measure": "SS1", "requirement": "5.2", "checks": ["wazuh:fim"], "why": "x"}
+    with pytest.raises(maturity.MaturityCatalogError, match="mapped twice"):
+        maturity.parse_mappings({"framework": FW, "mappings": [dup, dup]}, "bad.yaml", cats)
+
+
+def test_full_mapping_suggests_met_and_partial_only_supports(ev_client):
+    evidence.save_results("wazuh", [CheckResult("fim", "pass", "FIM ran on all agents"),
+                                    CheckResult("syscollector", "pass", "Inventory complete")])
+    ev = maturity.evidence_status(FW)
+    assert ev[("SS1", "5.2")]["signal"] == "supports" and ev[("SS1", "5.2")]["suggestion"] == "met"
+    assert ev[("AM2", "4.1")]["signal"] == "supports" and ev[("AM2", "4.1")]["suggestion"] is None
+    assert ev[("NS7", "3.2")]["signal"] == "incomplete"          # opnsense:ids never collected
+
+
+def test_failing_check_contradicts_and_ran_signal_counts_any_result(ev_client):
+    evidence.save_results("wazuh", [CheckResult("sca", "fail", "2 agents below 70%"),
+                                    CheckResult("vulnerabilities", "fail", "3 critical")])
+    ev = maturity.evidence_status(FW)
+    assert ev[("SS2", "5.7")]["signal"] == "contradicts" and ev[("SS2", "5.7")]["suggestion"] == "not_met"
+    # The scanner found critical issues, which proves it runs: VM1 4.1 is supported
+    assert ev[("VM1", "4.1")]["signal"] == "supports" and ev[("VM1", "4.1")]["suggestion"] == "met"
+
+
+def test_stale_and_unknown_evidence_give_no_signal(ev_client):
+    evidence.save_results("wazuh", [CheckResult("fim", "pass", "ok")])
+    later = datetime.now(timezone.utc) + timedelta(hours=100)
+    assert maturity.evidence_status(FW, now=later)[("SS1", "5.2")]["checks"][0]["state"] == "stale"
+    assert maturity.evidence_status(FW, now=later)[("SS1", "5.2")]["suggestion"] is None
+    evidence.save_results("wazuh", [CheckResult("fim", "unknown", "API error")])
+    assert maturity.evidence_status(FW)[("SS1", "5.2")]["signal"] == "incomplete"
+
+
+def test_old_evidence_without_check_name_is_matched(ev_client):
+    evidence.save_results("wazuh", [CheckResult("fim", "pass", "ok")])
+    with get_conn() as conn:
+        conn.execute("UPDATE evidence SET check_name = NULL")
+    assert maturity.evidence_status(FW)[("SS1", "5.2")]["signal"] == "supports"
+
+
+def test_apply_suggestions_never_overwrites_a_person(ev_client):
+    evidence.save_results("wazuh", [CheckResult("fim", "pass", "FIM ok"),
+                                    CheckResult("sca", "fail", "low score")])
+    maturity.save_answer(FW, "SS2", "5.7", "met", "Checked by hand", "alice")
+    saved = maturity.apply_suggestions(FW, "bob")
+    latest = maturity.latest_answers(FW)
+    assert saved == 1
+    assert latest[("SS1", "5.2")]["answer"] == "met" and latest[("SS1", "5.2")]["evidence_id"]
+    assert "wazuh:fim pass" in latest[("SS1", "5.2")]["note"]
+    assert latest[("SS2", "5.7")]["answer"] == "met" and latest[("SS2", "5.7")]["answered_by"] == "alice"
+    # ...but the contradiction is reported as a conflict
+    s = maturity.compute(FW)
+    assert [(c["measure_id"], c["requirement_id"]) for c in s["evidence_conflicts"]] == [("SS2", "5.7")]
+    assert maturity.apply_suggestions(FW, "bob") == 0
+
+
+def test_evidence_in_ui_and_api(ev_client):
+    evidence.save_results("wazuh", [CheckResult("fim", "pass", "FIM ran on all agents")])
+    page = ev_client.get(f"/maturity/{FW}/SS1").text
+    assert "Automated evidence" in page and "FIM ran on all agents" in page and "Apply evidence suggestions" in page
+    assert "1</strong> unanswered requirement" in ev_client.get(f"/maturity/{FW}").text
+    api = ev_client.get(f"/api/maturity/{FW}/evidence").json()
+    assert [(p["measure_id"], p["requirement_id"]) for p in api["pending"]] == [("SS1", "5.2")]
+    r = ev_client.post(f"/maturity/{FW}/apply-evidence", data={"measure_id": "SS1"}, follow_redirects=False)
+    assert r.status_code == 303 and "1%20answer" in r.headers["location"]
+    assert ev_client.post(f"/api/maturity/{FW}/evidence/apply").json() == {"saved": 0}
+    with LoggedInClient(app, role="viewer") as viewer:
+        assert viewer.post(f"/maturity/{FW}/apply-evidence", data={}).status_code == 403
+        assert "Apply evidence suggestions" not in viewer.get(f"/maturity/{FW}/SS1").text

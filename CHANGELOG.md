@@ -21,6 +21,17 @@
   requirement highlighted, answer history and "Save and go to next measure". Only
   changes are saved; an invalid answer saves nothing. Viewers see a read-only form.
   The dashboard shows a maturity summary card.
+- Automated evidence for the DSA model (`controls/maturity/evidence/dsa-cy-245-2024.yaml`):
+  23 requirements linked to Wazuh, OPNsense and Microsoft 365 checks, each with a written
+  rationale. Evidence never answers by itself. A "full" mapping can suggest "met"; a
+  "partial" one (most of them) can only suggest "not met" when its check fails, and a pass
+  is shown as supporting evidence. Evidence older than 72 hours gives no signal. Suggestions
+  can be applied to unanswered requirements (per measure or all at once) and are saved with
+  the evidence reference; answers given by a person are never overwritten. Saved answers
+  that the current evidence contradicts are reported as conflicts.
+- Automated evidence now records the collector check name (`evidence.check_name`); older
+  rows are matched through the control's automation field.
+- API: `GET /api/maturity/{id}/evidence`, `POST /api/maturity/{id}/evidence/apply`.
 - API: `GET /api/maturity`, `GET /api/maturity/{id}`,
   `GET /api/maturity/{id}/measures/{measure}`, `POST /api/maturity/{id}/answers`.
 

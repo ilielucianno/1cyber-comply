@@ -1,0 +1,164 @@
+# Automated evidence for the Cyprus DSA maturity model (K.D.P. 245/2024 Annex E)
+#
+# Links checks run by the collectors (wazuh, opnsense, microsoft365, comply) to DSA
+# requirements. Evidence never answers a requirement by itself: it suggests an answer
+# that a person accepts, and it flags answers that the current evidence contradicts.
+#
+# Fields:
+#   checks:   <source>:<check>; every listed check must give a signal
+#   signal:   pass (default) - a passing check supports the requirement, a failing one contradicts it
+#             ran           - any pass/fail result shows the tool is running (e.g. a vulnerability
+#                             scanner that finds critical issues is still scanning)
+#   coverage: full    - a passing check is enough to suggest "met"
+#             partial - the check covers only part of the requirement: a failure suggests
+#                       "not met", a pass is shown as supporting evidence only
+#   why:      what the check shows for this requirement (shown to the assessor and in reports)
+
+framework: dsa-cy-245-2024
+max_age_hours: 72      # older evidence is stale and gives no signal
+
+mappings:
+  # ---- Asset management ----
+  - measure: AM2
+    requirement: "4.1"
+    checks: [wazuh:syscollector]
+    coverage: partial
+    why: Wazuh syscollector records hardware and software of every endpoint with an agent. Assets without an agent and third-party hosted assets are not covered.
+
+  - measure: AM3
+    requirement: "2.1"
+    checks: [wazuh:agents_active]
+    coverage: partial
+    why: All registered Wazuh agents are active, so monitoring runs on the enrolled assets. It does not show that every critical asset in the inventory is enrolled.
+
+  - measure: AM3
+    requirement: "5.1"
+    checks: [wazuh:agents_active]
+    coverage: partial
+    why: Wazuh acts as the SIEM and every registered agent reports to it. Assets without an agent (e.g. some network devices) need syslog forwarding to be covered.
+
+  - measure: AM3
+    requirement: "5.2"
+    checks: [wazuh:alerts_recent]
+    coverage: partial
+    why: Wazuh rules fire and produce alerts. Whether notifications reach the appropriate staff has to be confirmed separately.
+
+  # ---- Identity and access management ----
+  - measure: IAM2
+    requirement: "3.3"
+    checks: [opnsense:vpn]
+    coverage: partial
+    why: A WireGuard VPN is active on the firewall, giving encrypted remote access. It does not show that every external access path uses it.
+
+  - measure: IAM3
+    requirement: "4.2"
+    checks: [microsoft365:privileged_accounts]
+    coverage: partial
+    why: Every Microsoft 365 / Entra ID administrator has MFA registered. Privileged accounts on on-site systems are not covered.
+
+  - measure: IAM4
+    requirement: "3.6"
+    checks: [microsoft365:mfa]
+    coverage: partial
+    why: MFA is enforced for Microsoft 365 users. Other systems' authentication is not covered.
+
+  - measure: IAM6
+    requirement: "3.1"
+    checks: [wazuh:agents_active]
+    coverage: partial
+    why: Security logging is collected from every system with an active Wazuh agent.
+
+  - measure: IAM6
+    requirement: "5.1"
+    checks: [opnsense:ids]
+    coverage: partial
+    why: Suricata intrusion detection is enabled and running on the firewall. Anomaly detection and its tuning are not covered.
+
+  - measure: IAM7
+    requirement: "4.2"
+    checks: [microsoft365:stale_accounts]
+    coverage: partial
+    why: No enabled Microsoft 365 account has been unused for longer than the configured period (M365_STALE_DAYS, default 90). Local and on-site accounts are not covered.
+
+  # ---- Network security ----
+  - measure: NS1
+    requirement: "2.4"
+    checks: [opnsense:firewall_rules]
+    coverage: partial
+    why: The firewall has a default-deny inbound rule and no unrestricted any-to-any inbound pass rules. Minimal services and the other rule principles need a review.
+
+  - measure: NS1
+    requirement: "3.15"
+    checks: [opnsense:vpn]
+    coverage: partial
+    why: Remote access goes through a WireGuard VPN on the firewall. The link to the AAA infrastructure is not checked.
+
+  - measure: NS1
+    requirement: "4.1"
+    checks: [opnsense:vpn]
+    coverage: partial
+    why: A VPN with current encryption (WireGuard) is active. Two-factor authentication on the VPN is not checked.
+
+  - measure: NS2
+    requirement: "3.1"
+    checks: [opnsense:vlans]
+    coverage: partial
+    why: The network is segmented with VLANs on the firewall. Physical segregation and filtering between segments need a review.
+
+  - measure: NS2
+    requirement: "4.1"
+    checks: [opnsense:vlans]
+    coverage: partial
+    why: VLANs are configured. Whether they follow department needs and data criticality has to be confirmed.
+
+  - measure: NS7
+    requirement: "3.2"
+    checks: [opnsense:ids]
+    coverage: partial
+    why: Suricata runs on the firewall. Full coverage needs IPS (blocking) mode; the check also passes in detect-only mode.
+
+  - measure: NS7
+    requirement: "4.1"
+    checks: [wazuh:alerts_recent]
+    coverage: partial
+    why: Wazuh records alerts for later analysis. Forwarding of IDS events from the firewall to Wazuh has to be confirmed.
+
+  - measure: NS7
+    requirement: "5.1"
+    checks: [wazuh:agents_active]
+    coverage: partial
+    why: The SIEM (Wazuh) collects data from every enrolled asset. Coverage of all assets has to be confirmed.
+
+  # ---- System security ----
+  - measure: SS1
+    requirement: "5.2"
+    checks: [wazuh:fim]
+    coverage: full
+    why: Wazuh file integrity monitoring ran recently on every active agent.
+
+  - measure: SS2
+    requirement: "5.7"
+    checks: [wazuh:sca]
+    coverage: partial
+    why: Wazuh SCA checks every active agent against CIS hardening benchmarks and all scores meet the threshold (SCA_MIN_SCORE). Prompt corrective action has to be confirmed.
+
+  # ---- Vulnerability management ----
+  - measure: VM1
+    requirement: "4.1"
+    checks: [wazuh:vulnerabilities]
+    signal: ran
+    coverage: full
+    why: Wazuh vulnerability detection runs automatically against the agents' software inventory.
+
+  - measure: VM3
+    requirement: "4.2"
+    checks: [wazuh:vulnerabilities, wazuh:syscollector]
+    signal: ran
+    coverage: partial
+    why: Wazuh tracks installed packages and their known vulnerabilities per agent. Assets without an agent are not covered.
+
+  - measure: VM3
+    requirement: "4.4"
+    checks: [opnsense:firmware, wazuh:agents_version]
+    coverage: partial
+    why: The firewall runs the latest OPNsense release and all Wazuh agents match the manager version. Other software is not covered.

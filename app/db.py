@@ -35,7 +35,8 @@ CREATE TABLE IF NOT EXISTS evidence (
     raw_json     TEXT,                     -- raw collected data
     collected_at TEXT NOT NULL DEFAULT (datetime('now')),
     reviewer     TEXT,                     -- manual evidence: who assessed it
-    valid_until  TEXT                      -- manual evidence: YYYY-MM-DD, expired = not compliant
+    valid_until  TEXT,                     -- manual evidence: YYYY-MM-DD, expired = not compliant
+    check_name   TEXT                      -- automated evidence: collector check, e.g. sca
 );
 
 CREATE INDEX IF NOT EXISTS idx_evidence_control ON evidence(control_id);
@@ -114,7 +115,7 @@ CREATE TABLE IF NOT EXISTS maturity_answers (
     answer         TEXT NOT NULL,          -- met | not_met | na
     note           TEXT,                   -- required for na
     answered_by    TEXT,
-    evidence_id    INTEGER REFERENCES evidence(id),   -- automated evidence behind the answer, if any
+    evidence_id    INTEGER REFERENCES evidence(id) ON DELETE SET NULL,  -- automated evidence behind the answer
     answered_at    TEXT NOT NULL DEFAULT (datetime('now'))
 );
 
@@ -147,6 +148,7 @@ MIGRATIONS = {
     "evidence": {
         "reviewer": "TEXT",
         "valid_until": "TEXT",
+        "check_name": "TEXT",
     },
 }
 
@@ -164,6 +166,7 @@ def init_db() -> None:
     with get_conn() as conn:
         conn.executescript(SCHEMA)
         _migrate(conn)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_evidence_check ON evidence(source, check_name)")
 
 
 @contextmanager
