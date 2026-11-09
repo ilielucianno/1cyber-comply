@@ -17,12 +17,13 @@ MINI = {
         "id": "mini", "name": "Mini model",
         "scoring": {"type": "maturity", "target_level": 3},
         "common_requirements": {"R1": "Documents are reviewed yearly."},
+        "not_applicable": {"cloud": {"title": "Cloud", "condition": "No cloud services are used."}},
     },
     "categories": [{"id": "X", "title": "Example", "measures": [{
         "id": "X1", "title": "Example measure", "level0": "Nothing in place.",
         "levels": {
             1: [{"id": "1.1", "text": "a"}, {"id": "1.2", "text": "b"}, {"id": "1.3", "text": "c"}],
-            2: [{"id": "2.1", "text": "d"}],
+            2: [{"id": "2.1", "text": "d", "na": "cloud"}],
             3: [{"id": "3.1", "text": "e"}, {"id": "3.2", "common": "R1"}],
             4: [{"id": "4.1", "text": "f"}],
             5: [{"id": "5.1", "text": "g"}],
@@ -88,6 +89,7 @@ def test_original_numbering_and_common_requirements_are_kept():
     (lambda d: d["categories"][0]["measures"][0]["levels"][2].append({"id": "2.1", "text": "x"}), "duplicate requirement"),
     (lambda d: d["categories"][0]["measures"][0]["levels"][2].append({"id": "3.9", "text": "x"}), "listed under level 2"),
     (lambda d: d["categories"][0]["measures"][0]["levels"][3].append({"id": "3.3", "common": "K9"}), "unknown common"),
+    (lambda d: d["categories"][0]["measures"][0]["levels"][4].append({"id": "4.2", "text": "x", "na": "onprem"}), "unknown not_applicable"),
     (lambda d: d["categories"][0]["measures"].append(copy.deepcopy(d["categories"][0]["measures"][0])), "duplicate measure"),
 ])
 def test_invalid_catalogue_is_rejected(mutate, message):
@@ -169,8 +171,27 @@ def test_save_answer_validation(client):
         maturity.save_answer(FW, "RM2", "3.2", "met")          # gap in the original numbering
     with pytest.raises(ValueError):
         maturity.save_answer(FW, "STR1", "1.1", "yes")
+    with pytest.raises(ValueError, match="cannot be marked not applicable"):
+        maturity.save_answer(FW, "STR1", "1.1", "na", note="We think so")
     with pytest.raises(ValueError, match="justification"):
-        maturity.save_answer(FW, "STR1", "1.1", "na")
+        maturity.save_answer(FW, "HRS6", "5.4", "na")
+
+
+def test_only_cloud_conditional_requirements_accept_na():
+    maturity.load_all()
+    cat = maturity.get(FW)
+    allowed = {(m.id, r.id) for m in cat.measures for r in m.requirements if r.na}
+    assert allowed == {("DS1", "4.9"), ("HRS6", "5.4")}
+    assert cat.na_sections["cloud"]["title"] == "Cloud"
+
+
+def test_na_is_reported_under_the_cloud_section(client):
+    maturity.save_answer(FW, "HRS6", "5.4", "na", note="No cloud services are used (checked 2026-11-09)")
+    s = maturity.compute(FW)
+    cloud = next(sec for sec in s["not_applicable_sections"] if sec["id"] == "cloud")
+    assert [(i["measure_id"], i["id"]) for i in cloud["items"]] == [("HRS6", "5.4")]
+    assert cloud["items"][0]["note"].startswith("No cloud")
+    assert s["not_applicable_total"] == 1
 
 
 def test_latest_answer_wins_and_history_is_kept(client):
@@ -202,10 +223,11 @@ def test_api_answers_score_and_snapshot(client):
     assert r.status_code == 200 and r.json()[0]["id"] == FW
     r = client.post(f"/api/maturity/{FW}/answers", json=[
         {"measure_id": "STR1", "requirement_id": "1.1", "answer": "met"},
-        {"measure_id": "STR1", "requirement_id": "1.2", "answer": "na", "note": "Covered by group policy"},
+        {"measure_id": "STR1", "requirement_id": "1.2", "answer": "met"},
+        {"measure_id": "DS1", "requirement_id": "4.9", "answer": "na", "note": "No data stored with third parties"},
     ])
     assert r.status_code == 200, r.text
-    assert r.json()["saved"] == 2
+    assert r.json()["saved"] == 3
     r = client.post(f"/api/maturity/{FW}/answers",
                     json={"measure_id": "STR1", "requirement_id": "1.3", "answer": "not_met"})
     assert r.status_code == 200
@@ -213,14 +235,15 @@ def test_api_answers_score_and_snapshot(client):
     assert d["level"] == 0 and d["blocking"]["id"] == "1.3"
     assert len(d["requirements"]) == len(maturity.get(FW).measure("STR1").requirements)
     score = client.get(f"/api/maturity/{FW}").json()
-    assert score["requirements_answered"] == 3
+    assert score["requirements_answered"] == 4
     assert len(score["history"]) == 1           # saves within the hour update one history point
 
 
 @pytest.mark.parametrize("body", [
     {"measure_id": "STR1", "requirement_id": "9.9", "answer": "met"},
     {"measure_id": "STR1", "requirement_id": "1.1", "answer": "maybe"},
-    {"measure_id": "STR1", "requirement_id": "1.1", "answer": "na"},
+    {"measure_id": "STR1", "requirement_id": "1.1", "answer": "na", "note": "not a cloud requirement"},
+    {"measure_id": "HRS6", "requirement_id": "5.4", "answer": "na"},
     [],
 ])
 def test_api_rejects_bad_answers_and_saves_nothing(client, body):

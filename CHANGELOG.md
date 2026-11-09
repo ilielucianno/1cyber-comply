@@ -8,8 +8,9 @@
   English translation in `controls/maturity/dsa-cy-245-2024.yaml`.
 - Maturity scoring engine (`app/maturity.py`). Levels are cumulative: the first unmet
   requirement caps the measure and is reported as the blocking requirement. Unanswered
-  requirements count as not met. "Not applicable" counts as met, needs a justification
-  and is listed for the auditor. The organisation is mature when every measure reaches
+  requirements count as not met. "Not applicable" is accepted only on requirements the
+  catalogue marks for it (DSA: DS1 4.9 and HRS6 5.4, which apply only when cloud services
+  are used), needs a justification noted on the requirement and is reported in a Cloud section. The organisation is mature when every measure reaches
   the target level (3 for the DSA model).
 - Assessment answers with full history (`maturity_answers`) and a result history
   (`maturity_history`).

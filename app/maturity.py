@@ -11,8 +11,10 @@ Scoring rule (cumulative, "first failure caps the level"):
     level 2 and 3 requirement is met.
   * An unanswered requirement counts as not met (the result never looks better
     than what has been assessed) but is reported as "not assessed".
-  * "na" (not applicable) counts as met and needs a written justification;
-    reports list it so an auditor can challenge it.
+  * "na" (not applicable) is accepted only on requirements the catalogue marks
+    with an `na` section (for the DSA model: requirements that only apply when
+    cloud services are used). It counts as met, needs a written justification
+    noted on the requirement, and reports list it under its section (e.g. Cloud).
   * The organisation is mature when every measure reaches the target level.
 
 Catalogues live in controls/maturity/*.yaml and are kept in memory; the
@@ -44,6 +46,7 @@ class Requirement:
     level: int
     text: str
     common: str | None = None   # K1 / K2 / R1 when the requirement repeats across measures
+    na: str | None = None       # section under which "not applicable" is accepted, e.g. cloud
 
 
 @dataclass
@@ -73,6 +76,7 @@ class Catalogue:
     translation: str
     measures: list[Measure]
     file: str = ""
+    na_sections: dict = field(default_factory=dict)   # {"cloud": {"title": "Cloud", "condition": "..."}}
 
     def measure(self, measure_id: str) -> Measure | None:
         return next((m for m in self.measures if m.id == measure_id), None)
@@ -100,6 +104,10 @@ def parse(data: dict, source: str) -> Catalogue:
     if target not in LEVELS:
         raise MaturityCatalogError(f"{source}: target_level must be one of {LEVELS}")
     common = {str(k): str(v) for k, v in (fw.get("common_requirements") or {}).items()}
+    na_sections = {str(k): dict(v or {}) for k, v in (fw.get("not_applicable") or {}).items()}
+    for k, v in na_sections.items():
+        if not v.get("title"):
+            raise MaturityCatalogError(f"{source}: not_applicable.{k} has no title")
 
     measures: list[Measure] = []
     seen: set[str] = set()
@@ -135,10 +143,13 @@ def parse(data: dict, source: str) -> Catalogue:
                     tag = r.get("common")
                     if tag and tag not in common:
                         raise MaturityCatalogError(f"{source}: {mid} {rid} refers to unknown common requirement {tag}")
+                    na = r.get("na")
+                    if na and na not in na_sections:
+                        raise MaturityCatalogError(f"{source}: {mid} {rid} refers to unknown not_applicable section {na}")
                     text = str(r.get("text") or (common.get(tag) if tag else "") or "").strip()
                     if not text:
                         raise MaturityCatalogError(f"{source}: {mid} {rid} has no text")
-                    reqs.append(Requirement(rid, lv, text, tag))
+                    reqs.append(Requirement(rid, lv, text, tag, na))
             measures.append(Measure(
                 id=mid, title=m["title"], category_id=cat["id"], category_title=cat["title"],
                 objective=(m.get("objective") or "").strip(), description=(m.get("description") or "").strip(),
@@ -148,7 +159,8 @@ def parse(data: dict, source: str) -> Catalogue:
         raise MaturityCatalogError(f"{source}: no measures")
     return Catalogue(id=fw["id"], name=fw["name"], authority=fw.get("authority", ""),
                      reference=fw.get("reference", ""), target_level=target,
-                     translation=(fw.get("translation") or "").strip(), measures=measures, file=source)
+                     translation=(fw.get("translation") or "").strip(), measures=measures, file=source,
+                     na_sections=na_sections)
 
 
 def load_all(directory: Path = MATURITY_DIR) -> dict[str, int]:
@@ -185,13 +197,13 @@ def save_answer(framework_id: str, measure_id: str, requirement_id: str, answer:
     measure = cat.measure(measure_id)
     if not measure:
         raise KeyError(f"Measure '{measure_id}' does not exist in {framework_id}")
-    if not measure.requirement(requirement_id):
+    req = measure.requirement(requirement_id)
+    if not req:
         raise KeyError(f"Requirement '{requirement_id}' does not exist in {measure_id}")
-    if answer not in ANSWERS:
-        raise ValueError(f"Answer must be one of {', '.join(ANSWERS)}")
+    error = answer_error(req, answer, note)
+    if error:
+        raise ValueError(error)
     note = (note or "").strip()
-    if answer == "na" and not note:
-        raise ValueError("A justification is required when a requirement is marked not applicable")
     if len(note) > 4000:
         raise ValueError("Note is too long (max 4000 characters)")
     with get_conn() as conn:
@@ -200,6 +212,18 @@ def save_answer(framework_id: str, measure_id: str, requirement_id: str, answer:
                                              answered_by, evidence_id) VALUES (?, ?, ?, ?, ?, ?, ?)""",
             (framework_id, measure_id, requirement_id, answer, note or None, answered_by, evidence_id),
         ).lastrowid
+
+
+def answer_error(req: Requirement, answer: str, note: str | None) -> str | None:
+    """Why an answer is not acceptable for this requirement, or None if it is."""
+    if answer not in ANSWERS:
+        return f"Answer must be one of {', '.join(ANSWERS)}"
+    if answer == "na":
+        if not req.na:
+            return f"Requirement {req.id} cannot be marked not applicable"
+        if not (note or "").strip():
+            return "A justification is required when a requirement is marked not applicable"
+    return None
 
 
 def latest_answers(framework_id: str) -> dict[tuple[str, str], dict]:
@@ -224,7 +248,7 @@ def answer_history(framework_id: str, measure_id: str) -> list[dict]:
 # ---------- scoring ----------
 
 def req_view(r: Requirement, a: dict | None) -> dict:
-    return {"id": r.id, "level": r.level, "text": r.text, "common": r.common,
+    return {"id": r.id, "level": r.level, "text": r.text, "common": r.common, "na_section": r.na,
             "answer": a["answer"] if a else None, "note": a["note"] if a else None,
             "answered_by": a["answered_by"] if a else None, "answered_at": a["answered_at"] if a else None}
 
@@ -295,6 +319,11 @@ def compute(framework_id: str) -> dict:
         "distribution": {lv: levels.count(lv) for lv in (0, *LEVELS)},
         "requirements_total": total_reqs, "requirements_answered": answered,
         "not_applicable_total": sum(len(s["not_applicable"]) for s in measures),
+        "not_applicable_sections": [
+            {"id": sec, "title": info.get("title", sec), "condition": info.get("condition", ""),
+             "items": [{"measure_id": s["id"], "measure_title": s["title"], **r}
+                       for s in measures for r in s["not_applicable"] if r["na_section"] == sec]}
+            for sec, info in cat.na_sections.items()],
         "categories": list(categories.values()),
     }
 

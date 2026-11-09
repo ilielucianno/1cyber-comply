@@ -7,6 +7,7 @@
 # Field reference:
 #   level0: the state that scores 0 (no measures in place)
 #   levels: requirements per maturity level 1-5; ids keep the original numbering
+#   na:     the requirement may be answered 'not applicable' under that section (justification required)
 #   common: K1/K2/R1 marks a requirement repeated across measures (see common_requirements)
 #   page:   page of K.D.P. 245/2024 where the measure starts
 
@@ -45,6 +46,12 @@ framework:
     R1: >-
       The related documents are reviewed for suitability at least once a year. Any changes follow the
       change management process.
+  not_applicable:
+    cloud:
+      title: Cloud
+      condition: >-
+        Only where the organisation does not use cloud services. DSA auditors accept not applicable for
+        these requirements when the justification is noted in place.
 categories:
 - id: STR
   title: Strategy
@@ -1376,6 +1383,7 @@ categories:
           Where a third party performs erasure or destruction, the contract contains provisions ensuring
           the rules are applied correctly and effectively.
       - id: '4.9'
+        na: cloud
         text: >-
           Where data is stored with third parties (e.g. cloud services), the third party gives specific
           commitments and evidence that these arrangements are implemented; otherwise compensating measures
@@ -5269,6 +5277,7 @@ categories:
         text: >-
           These actions and guidelines comply with applicable legislation, especially on personal data.
       - id: '5.4'
+        na: cloud
         text: >-
           Where cloud services are used, the guidelines and policies also apply to those resources, both
           for staff and for the cloud provider (the latter through contracts).

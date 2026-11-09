@@ -201,10 +201,9 @@ async def api_maturity_answer(request: Request, framework_id: str):
         m = maturity.get(framework_id).measure(str(i.get("measure_id", "")))
         if not m or not m.requirement(str(i.get("requirement_id", ""))):
             raise HTTPException(status_code=400, detail=f"Unknown measure/requirement in {i}")
-        if i.get("answer") not in maturity.ANSWERS:
-            raise HTTPException(status_code=400, detail=f"answer must be one of {', '.join(maturity.ANSWERS)}")
-        if i["answer"] == "na" and not str(i.get("note") or "").strip():
-            raise HTTPException(status_code=400, detail="A justification (note) is required for na")
+        error = maturity.answer_error(m.requirement(str(i["requirement_id"])), i.get("answer"), str(i.get("note") or ""))
+        if error:
+            raise HTTPException(status_code=400, detail=error)
     ids = [maturity.save_answer(framework_id, str(i["measure_id"]), str(i["requirement_id"]), i["answer"],
                                 str(i.get("note") or ""), who) for i in items]
     auth.audit("maturity.answer", who, f"{framework_id}: {len(ids)} answer(s)", client_ip(request))
