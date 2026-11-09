@@ -10,7 +10,7 @@ from fastapi import Depends, FastAPI, File, Form, HTTPException, Request, Upload
 from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse, Response
 from fastapi.templating import Jinja2Templates
 
-from app import auth, auth_routes, catalog, config, evidence, manual, report, scoring
+from app import auth, auth_routes, catalog, config, evidence, manual, maturity, report, scoring
 from app.guard import client_ip, guard
 from app.scheduler import run_all, scheduler
 from app.db import get_conn, init_db
@@ -40,6 +40,7 @@ templates.env.globals["source_label"] = evidence.SOURCE_LABELS
 async def lifespan(_app: FastAPI):
     init_db()            # create / migrate tables
     catalog.load_all()   # load controls from controls/*.yaml
+    maturity.load_all()  # load maturity models from controls/maturity/*.yaml
     scheduler.start()    # automatic collection (if COLLECT_INTERVAL_HOURS > 0)
     yield
     scheduler.stop()
@@ -149,6 +150,67 @@ def api_controls(framework_id: str):
 def api_score(framework_id: str):
     _framework(framework_id)
     return {**scoring.compute(framework_id), "history": scoring.history(framework_id)}
+
+
+# ---------- Maturity model API ----------
+
+def _maturity(framework_id: str) -> maturity.Catalogue:
+    cat = maturity.get(framework_id)
+    if not cat:
+        raise HTTPException(status_code=404, detail=f"Maturity framework '{framework_id}' does not exist")
+    return cat
+
+
+@app.get("/api/maturity")
+def api_maturity_list():
+    return [{"id": c.id, "name": c.name, "authority": c.authority, "reference": c.reference,
+             "target_level": c.target_level, "measures": len(c.measures),
+             "requirements": c.requirement_count} for c in maturity.catalogues()]
+
+
+@app.get("/api/maturity/{framework_id}")
+def api_maturity_score(framework_id: str):
+    _maturity(framework_id)
+    return {**maturity.compute(framework_id), "history": maturity.history(framework_id)}
+
+
+@app.get("/api/maturity/{framework_id}/measures/{measure_id}")
+def api_maturity_measure(framework_id: str, measure_id: str):
+    cat = _maturity(framework_id)
+    m = cat.measure(measure_id)
+    if not m:
+        raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
+    answers = maturity.latest_answers(framework_id)
+    score = maturity.score_measure(m, answers, cat.target_level)
+    return {**score, "objective": m.objective, "description": m.description, "source": m.source,
+            "page": m.page, "level0": m.level0,
+            "requirements": [maturity.req_view(r, answers.get((m.id, r.id))) for r in m.requirements],
+            "history": maturity.answer_history(framework_id, measure_id)}
+
+
+@app.post("/api/maturity/{framework_id}/answers")
+async def api_maturity_answer(request: Request, framework_id: str):
+    """Body: {"measure_id", "requirement_id", "answer": met|not_met|na, "note"} or a list of them."""
+    _maturity(framework_id)
+    body = await request.json()
+    items = body if isinstance(body, list) else [body]
+    if not items or len(items) > 500 or not all(isinstance(i, dict) for i in items):
+        raise HTTPException(status_code=400, detail="Send one answer object or a list of up to 500")
+    who = _who(request)
+    for i in items:     # validate everything first, so a bad item saves nothing
+        m = maturity.get(framework_id).measure(str(i.get("measure_id", "")))
+        if not m or not m.requirement(str(i.get("requirement_id", ""))):
+            raise HTTPException(status_code=400, detail=f"Unknown measure/requirement in {i}")
+        if i.get("answer") not in maturity.ANSWERS:
+            raise HTTPException(status_code=400, detail=f"answer must be one of {', '.join(maturity.ANSWERS)}")
+        if i["answer"] == "na" and not str(i.get("note") or "").strip():
+            raise HTTPException(status_code=400, detail="A justification (note) is required for na")
+    ids = [maturity.save_answer(framework_id, str(i["measure_id"]), str(i["requirement_id"]), i["answer"],
+                                str(i.get("note") or ""), who) for i in items]
+    auth.audit("maturity.answer", who, f"{framework_id}: {len(ids)} answer(s)", client_ip(request))
+    s = maturity.snapshot(framework_id)
+    return {"saved": len(ids), "mature": s["mature"], "measures_at_target": s["measures_at_target"],
+            "measures_total": s["measures_total"]}
 
 
 @app.get("/api/schedule")

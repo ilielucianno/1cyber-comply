@@ -1,5 +1,21 @@
 # Changelog
 
+## Unreleased (v1.2.0)
+
+### Added
+- Maturity model support, starting with the Cyprus DSA cybersecurity maturity model
+  (K.D.P. 245/2024, Annex E): 70 measures in 17 categories, levels 0-5, unofficial
+  English translation in `controls/maturity/dsa-cy-245-2024.yaml`.
+- Maturity scoring engine (`app/maturity.py`). Levels are cumulative: the first unmet
+  requirement caps the measure and is reported as the blocking requirement. Unanswered
+  requirements count as not met. "Not applicable" counts as met, needs a justification
+  and is listed for the auditor. The organisation is mature when every measure reaches
+  the target level (3 for the DSA model).
+- Assessment answers with full history (`maturity_answers`) and a result history
+  (`maturity_history`).
+- API: `GET /api/maturity`, `GET /api/maturity/{id}`,
+  `GET /api/maturity/{id}/measures/{measure}`, `POST /api/maturity/{id}/answers`.
+
 ## v1.1.0 - 2026-11-06
 
 - **Microsoft 365 / Entra ID collector (beta)**: MFA enforcement (security defaults or Conditional

@@ -104,6 +104,34 @@ CREATE TABLE IF NOT EXISTS audit_log (
 );
 
 CREATE INDEX IF NOT EXISTS idx_score_fw ON score_history(framework_id, taken_at);
+
+-- Maturity model assessments (catalogues in controls/maturity/*.yaml, kept in memory)
+CREATE TABLE IF NOT EXISTS maturity_answers (
+    id             INTEGER PRIMARY KEY AUTOINCREMENT,
+    framework_id   TEXT NOT NULL,          -- e.g. dsa-cy-245-2024
+    measure_id     TEXT NOT NULL,          -- e.g. IAM4
+    requirement_id TEXT NOT NULL,          -- original numbering, e.g. 3.2
+    answer         TEXT NOT NULL,          -- met | not_met | na
+    note           TEXT,                   -- required for na
+    answered_by    TEXT,
+    evidence_id    INTEGER REFERENCES evidence(id),   -- automated evidence behind the answer, if any
+    answered_at    TEXT NOT NULL DEFAULT (datetime('now'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_maturity_req ON maturity_answers(framework_id, measure_id, requirement_id);
+
+CREATE TABLE IF NOT EXISTS maturity_history (
+    id           INTEGER PRIMARY KEY AUTOINCREMENT,
+    framework_id TEXT NOT NULL,
+    taken_at     TEXT NOT NULL DEFAULT (datetime('now')),
+    mature       INTEGER NOT NULL,         -- 1 when every measure reaches the target level
+    avg_level    REAL NOT NULL,
+    min_level    INTEGER NOT NULL,
+    at_target    INTEGER NOT NULL,         -- measures at or above the target level
+    total        INTEGER NOT NULL,
+    answered     INTEGER NOT NULL,         -- requirements with an answer
+    requirements_total INTEGER NOT NULL
+);
 """
 
 
