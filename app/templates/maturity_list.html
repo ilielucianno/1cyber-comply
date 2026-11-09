@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}Maturity models · {{ app_name }}{% endblock %}
+{% block content %}
+<h1 style="font-size:22px;margin:0 0 16px">Maturity models</h1>
+<div class="card">
+  {% for i in items %}
+  <div class="row">
+    <span><a href="/maturity/{{ i.cat.id }}">{{ i.cat.name }}</a> <span class="muted">{{ i.cat.reference }}</span></span>
+    <span class="muted">{{ i.score.measures_at_target }}/{{ i.score.measures_total }} measures at level {{ i.cat.target_level }}</span>
+  </div>
+  {% else %}
+  <div class="row muted">No maturity models loaded. Add a catalogue to controls/maturity/.</div>
+  {% endfor %}
+</div>
+{% endblock %}

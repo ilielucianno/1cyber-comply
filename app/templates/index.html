@@ -25,6 +25,24 @@
 </div>
 {% endfor %}
 
+{% for ms in maturity %}
+<div class="card" style="margin-bottom:24px">
+  <div class="score">
+    <div>
+      <div class="sub">{{ ms.name }}</div>
+      <div class="big {{ 'ok' if ms.mature else 'off' }}">{{ ms.measures_at_target }}/{{ ms.measures_total }}</div>
+      <div class="sub">measures at level {{ ms.target_level }} or higher</div>
+    </div>
+    <div class="sub">
+      <div>{{ 'Mature: every measure is at the target level' if ms.mature else 'Not mature yet: ' ~ ms.below_target ~ ' measure(s) below level ' ~ ms.target_level }}</div>
+      <div>Average level {{ ms.avg_level }} · lowest level {{ ms.min_level }}</div>
+      <div>{{ ms.requirements_answered }} of {{ ms.requirements_total }} requirements assessed</div>
+    </div>
+    <div style="margin-left:auto"><a class="btn" href="/maturity/{{ ms.framework_id }}">Open assessment</a></div>
+  </div>
+</div>
+{% endfor %}
+
 <div class="grid">
   <div class="card"><div class="num">{{ stats.frameworks }}</div><div class="lbl">Frameworks</div></div>
   <div class="card"><div class="num">{{ stats.controls }}</div><div class="lbl">Controls</div></div>

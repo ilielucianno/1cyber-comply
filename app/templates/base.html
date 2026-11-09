@@ -58,6 +58,19 @@
   input[type=file] { padding:5px; }
   a.btn { display:inline-block; background:#21262d; color:var(--text); border:1px solid var(--line); border-radius:6px; padding:5px 12px; font-size:13px; text-decoration:none; }
   a.btn:hover { border-color:var(--accent); }
+  .lv { display:inline-block; min-width:28px; text-align:center; font-size:12px; font-weight:700; padding:2px 8px; border-radius:10px; }
+  .lv.hi { background:#12361f; color:var(--ok); }
+  .lv.mid { background:#3a3324; color:#e3c27a; }
+  .lv.lo { background:#3d1418; color:#f85149; }
+  .dist { display:flex; height:10px; border-radius:5px; overflow:hidden; background:#2a333d; margin-top:8px; }
+  .dist span { display:block; height:100%; }
+  .req { padding:12px 0; border-bottom:1px solid var(--line); }
+  .req:last-child { border-bottom:0; }
+  .req.block { background:#2b1a1d; margin:0 -16px; padding:12px 16px; border-left:3px solid #f85149; }
+  .req .opts { display:flex; gap:16px; flex-wrap:wrap; margin-top:8px; font-size:14px; align-items:center; }
+  .req .opts label { display:flex; gap:6px; align-items:center; cursor:pointer; }
+  .req .opts input[type=text] { flex:1; min-width:220px; padding:5px 8px; font-size:13px; }
+  .pill { font-size:11px; padding:1px 7px; border-radius:10px; background:#2a333d; color:var(--muted); }
   .evidence { font-size:13px; margin-top:6px; padding:6px 10px; background:#0f1419; border-radius:6px; }
 </style>
 </head>
@@ -69,6 +82,7 @@
     {% if me %}
     <a href="/" class="{{ 'active' if page == 'home' }}">Dashboard</a>
     <a href="/controls" class="{{ 'active' if page == 'controls' }}">Controls</a>
+    <a href="/maturity" class="{{ 'active' if page == 'maturity' }}">Maturity</a>
     {% if me.role == 'admin' %}
     <a href="/users" class="{{ 'active' if page == 'users' }}">Users</a>
     <a href="/audit" class="{{ 'active' if page == 'audit' }}">Audit log</a>

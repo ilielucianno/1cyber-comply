@@ -276,6 +276,7 @@ def index(request: Request, msg: str | None = None, ok: int = 1):
         "stats": _stats(), "sources": _sources(), "frameworks": frameworks,
         "collectors": evidence.get_collectors(), "runs": evidence.last_runs(),
         "schedule": api_schedule(), "flash": msg, "flash_ok": bool(ok),
+        "maturity": [maturity.compute(c.id) for c in maturity.catalogues()],
     })
 
 
@@ -311,6 +312,96 @@ def control_page(request: Request, framework_id: str, control_id: str, msg: str 
         "today": date.today().isoformat(), "allowed": ", ".join(sorted(manual.ALLOWED_EXTENSIONS)),
         "flash": msg, "flash_ok": bool(ok),
     })
+
+
+# ---------- Maturity assessment UI ----------
+
+def _ui(request: Request, template: str, page: str, **ctx):
+    return templates.TemplateResponse(request, template, {
+        "app_name": config.APP_NAME, "version": config.APP_VERSION, "page": page, **ctx})
+
+
+@app.get("/maturity", response_class=HTMLResponse)
+def maturity_list(request: Request):
+    cats = maturity.catalogues()
+    if len(cats) == 1:
+        return RedirectResponse(f"/maturity/{cats[0].id}", status_code=303)
+    return _ui(request, "maturity_list.html", "maturity",
+               items=[{"cat": c, "score": maturity.compute(c.id)} for c in cats])
+
+
+@app.get("/maturity/{framework_id}", response_class=HTMLResponse)
+def maturity_page(request: Request, framework_id: str, show: str = "all", msg: str | None = None, ok: int = 1):
+    cat = _maturity(framework_id)
+    show = show if show in ("all", "below", "open") else "all"
+    keep = {"all": lambda x: True, "below": lambda x: not x["meets_target"],
+            "open": lambda x: x["answered"] < x["total"]}[show]
+    s = maturity.compute(framework_id)
+    for c in s["categories"]:
+        c["shown"] = [x for x in c["measures"] if keep(x)]
+    return _ui(request, "maturity.html", "maturity", cat=cat, s=s, show=show, flash=msg, flash_ok=bool(ok))
+
+
+@app.get("/maturity/{framework_id}/{measure_id}", response_class=HTMLResponse)
+def maturity_measure_page(request: Request, framework_id: str, measure_id: str,
+                          msg: str | None = None, ok: int = 1):
+    cat = _maturity(framework_id)
+    m = cat.measure(measure_id)
+    if not m:
+        raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
+    answers = maturity.latest_answers(framework_id)
+    idx = cat.measures.index(m)
+    return _ui(request, "maturity_measure.html", "maturity", cat=cat, m=m,
+               s=maturity.score_measure(m, answers, cat.target_level),
+               reqs=[maturity.req_view(r, answers.get((m.id, r.id))) for r in m.requirements],
+               history=maturity.answer_history(framework_id, measure_id)[:50],
+               prev=cat.measures[idx - 1] if idx > 0 else None,
+               next=cat.measures[idx + 1] if idx + 1 < len(cat.measures) else None,
+               flash=msg, flash_ok=bool(ok))
+
+
+@app.post("/maturity/{framework_id}/{measure_id}")
+async def maturity_measure_save(request: Request, framework_id: str, measure_id: str):
+    """Form fields: a:<req id> = met|not_met|na and n:<req id> = note. Only changes are saved."""
+    cat = _maturity(framework_id)
+    m = cat.measure(measure_id)
+    if not m:
+        raise HTTPException(status_code=404, detail=f"Measure '{measure_id}' does not exist")
+    form = await request.form()
+    base = f"/maturity/{framework_id}/{measure_id}"
+    latest = maturity.latest_answers(framework_id)
+    changes = []
+    for r in m.requirements:
+        answer = str(form.get(f"a:{r.id}", "") or "")
+        note = str(form.get(f"n:{r.id}", "") or "").strip()
+        prev = latest.get((m.id, r.id))
+        if not answer:
+            if prev and note != (prev["note"] or ""):
+                answer = prev["answer"]          # note edited without touching the answer
+            else:
+                continue
+        if prev and prev["answer"] == answer and (prev["note"] or "") == note:
+            continue
+        error = maturity.answer_error(r, answer, note)
+        if error:     # nothing is saved when any answer is invalid
+            return RedirectResponse(f"{base}?ok=0&msg={quote(f'{r.id}: {error}. Nothing was saved.')}",
+                                    status_code=303)
+        changes.append((r.id, answer, note))
+    who = _who(request)
+    for rid, answer, note in changes:
+        maturity.save_answer(framework_id, m.id, rid, answer, note, who)
+    if changes:
+        auth.audit("maturity.answer", who, f"{framework_id} {m.id}: {len(changes)} answer(s)", client_ip(request))
+        maturity.snapshot(framework_id)
+    score = maturity.score_measure(m, maturity.latest_answers(framework_id), cat.target_level)
+    msg = (f"{len(changes)} answer(s) saved. {m.id} is at level {score['level']}" if changes
+           else "No changes to save.")
+    target = base
+    if form.get("next"):
+        idx = cat.measures.index(m)
+        if idx + 1 < len(cat.measures):
+            target = f"/maturity/{framework_id}/{cat.measures[idx + 1].id}"
+    return RedirectResponse(f"{target}?ok=1&msg={quote(msg)}", status_code=303)
 
 
 @app.post("/controls/{framework_id}/{control_id}/evidence")

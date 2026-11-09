@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}{{ m.id }} · {{ app_name }}{% endblock %}
+{% macro lv(level) -%}
+<span class="lv {{ 'hi' if level >= cat.target_level else ('mid' if level >= cat.target_level - 1 else 'lo') }}">{{ level }}</span>
+{%- endmacro %}
+{% block content %}
+{% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
+{% set can_edit = request.state.user.role in ('admin', 'editor') %}
+
+<p style="margin-top:0;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+  <a href="/maturity/{{ cat.id }}">&larr; {{ cat.name }}</a>
+  <span>
+    {% if prev %}<a href="/maturity/{{ cat.id }}/{{ prev.id }}">&lsaquo; {{ prev.id }}</a>{% endif %}
+    {% if prev and next %} · {% endif %}
+    {% if next %}<a href="/maturity/{{ cat.id }}/{{ next.id }}">{{ next.id }} &rsaquo;</a>{% endif %}
+  </span>
+</p>
+<h1 style="font-size:22px;margin:0 0 4px"><code style="font-size:18px;color:inherit">{{ m.id }}</code> {{ m.title }}</h1>
+<p class="muted" style="margin:0 0 16px">{{ m.category_title }}{% if m.page %} · {{ cat.reference }}, page {{ m.page }}{% endif %}
+  {% if m.source %} · source: {{ m.source }}{% endif %}</p>
+
+<div class="card">
+  <div><strong>Objective.</strong> {{ m.objective }}</div>
+  <div style="margin-top:8px;font-size:14px" class="muted">{{ m.description }}</div>
+</div>
+
+<div class="card" style="margin-top:16px">
+  <div class="score">
+    <div>
+      <div class="sub">Current level</div>
+      <div class="big"><span class="lv {{ 'hi' if s.level >= cat.target_level else ('mid' if s.level >= cat.target_level - 1 else 'lo') }}" style="font-size:36px;padding:6px 18px;border-radius:12px">{{ s.level }}</span></div>
+    </div>
+    <div class="sub">
+      {% if s.blocking %}
+      <div>Blocked by <a href="#r-{{ s.blocking.id }}">{{ s.blocking.id }}</a>
+        ({{ 'not met' if s.blocking.reason == 'not_met' else 'not assessed yet' }})</div>
+      {% else %}
+      <div class="ok">Every requirement up to level 5 is met.</div>
+      {% endif %}
+      <div>{{ 'Meets' if s.meets_target else 'Below' }} the target level {{ cat.target_level }}
+        {% if not s.meets_target %}· {{ s.gaps_to_target|length }} requirement(s) open up to level {{ cat.target_level }}{% endif %}</div>
+      <div>{{ s.answered }} of {{ s.total }} requirements assessed</div>
+    </div>
+  </div>
+  <div class="muted" style="font-size:13px;margin-top:10px">Level 0: {{ m.level0 }}</div>
+</div>
+
+<form method="post" action="/maturity/{{ cat.id }}/{{ m.id }}" style="display:block">
+  <input type="hidden" name="csrf_token" value="{{ request.state.csrf }}">
+  {% for level in [1, 2, 3, 4, 5] %}
+  {% set pl = s.per_level[level] %}
+  <h2>Level {{ level }} <span style="text-transform:none;letter-spacing:0">· {{ pl.met }}/{{ pl.total }} met</span></h2>
+  <div class="card">
+    {% for r in reqs if r.level == level %}
+    <div class="req {{ 'block' if s.blocking and s.blocking.id == r.id }}" id="r-{{ r.id }}">
+      <div><code style="color:var(--accent);font-size:13px;font-weight:600">{{ r.id }}</code> {{ r.text }}
+        {% if r.common %}<span class="pill" title="Repeated across measures">{{ r.common }}</span>{% endif %}
+        {% if r.na_section %}<span class="pill" title="May be not applicable">{{ cat.na_sections[r.na_section].title }}</span>{% endif %}
+      </div>
+      <div class="opts">
+        <label><input type="radio" name="a:{{ r.id }}" value="met" {{ 'checked' if r.answer == 'met' }} {{ 'disabled' if not can_edit }}> Met</label>
+        <label><input type="radio" name="a:{{ r.id }}" value="not_met" {{ 'checked' if r.answer == 'not_met' }} {{ 'disabled' if not can_edit }}> Not met</label>
+        {% if r.na_section %}
+        <label><input type="radio" name="a:{{ r.id }}" value="na" {{ 'checked' if r.answer == 'na' }} {{ 'disabled' if not can_edit }}> Not applicable</label>
+        {% endif %}
+        <input type="text" name="n:{{ r.id }}" value="{{ r.note or '' }}" maxlength="4000" {{ 'disabled' if not can_edit }}
+               placeholder="{{ 'Justification (required for not applicable)' if r.na_section else 'Note: evidence, document, gap' }}">
+      </div>
+      {% if r.answered_at %}<div class="muted" style="font-size:12px;margin-top:4px">{{ r.answered_by }} · {{ r.answered_at }} UTC</div>
+      {% else %}<div class="muted" style="font-size:12px;margin-top:4px">Not assessed</div>{% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  {% endfor %}
+  {% if can_edit %}
+  <div style="margin-top:16px;display:flex;gap:8px">
+    <button type="submit">Save</button>
+    {% if next %}<button type="submit" name="next" value="1">Save and go to {{ next.id }}</button>{% endif %}
+  </div>
+  {% endif %}
+</form>
+
+<h2>Answer history</h2>
+<div class="card">
+  {% for h in history %}
+  <div class="row" style="font-size:13px">
+    <span><code style="color:inherit">{{ h.requirement_id }}</code>
+      <span class="st {{ 'pass' if h.answer == 'met' else ('fail' if h.answer == 'not_met' else 'unknown') }}">{{ h.answer|replace('_', ' ') }}</span>
+      {{ h.note or '' }}</span>
+    <span class="muted">{{ h.answered_by }} · {{ h.answered_at }} UTC</span>
+  </div>
+  {% else %}
+  <div class="row muted">No answers yet.</div>
+  {% endfor %}
+</div>
+{% endblock %}

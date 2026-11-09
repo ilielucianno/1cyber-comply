@@ -14,6 +14,13 @@
   the target level (3 for the DSA model).
 - Assessment answers with full history (`maturity_answers`) and a result history
   (`maturity_history`).
+- Assessment screens: a Maturity page with the result, the level distribution, every
+  measure with its level and blocking requirement (filters: below target, not fully
+  assessed) and the Cloud not-applicable section; a page per measure with the
+  requirements by level, met / not met / not applicable choices, notes, the blocking
+  requirement highlighted, answer history and "Save and go to next measure". Only
+  changes are saved; an invalid answer saves nothing. Viewers see a read-only form.
+  The dashboard shows a maturity summary card.
 - API: `GET /api/maturity`, `GET /api/maturity/{id}`,
   `GET /api/maturity/{id}/measures/{measure}`, `POST /api/maturity/{id}/answers`.
 

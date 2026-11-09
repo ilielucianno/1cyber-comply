@@ -261,3 +261,58 @@ def test_api_404_and_viewer_cannot_answer(client):
         r = viewer.post(f"/api/maturity/{FW}/answers",
                         json={"measure_id": "STR1", "requirement_id": "1.1", "answer": "met"})
         assert r.status_code == 403
+
+
+# ---------- assessment screens ----------
+
+def test_maturity_pages_render(client):
+    r = client.get("/maturity", follow_redirects=False)
+    assert r.status_code == 303 and r.headers["location"] == f"/maturity/{FW}"
+    r = client.get(f"/maturity/{FW}")
+    assert r.status_code == 200 and "0/70" in r.text and "Not mature yet" in r.text
+    for show in ("below", "open", "bogus"):
+        assert client.get(f"/maturity/{FW}?show={show}").status_code == 200
+    r = client.get(f"/maturity/{FW}/HRS6")
+    assert r.status_code == 200
+    assert 'name="a:5.4" value="na"' in r.text            # cloud requirement offers N/A
+    assert 'name="a:1.1" value="na"' not in r.text        # others do not
+    assert "Save and go to" in r.text
+    assert client.get(f"/maturity/{FW}/NOPE").status_code == 404
+    assert "Open assessment" in client.get("/").text
+
+
+def test_form_saves_only_changes_and_applies_the_rule(client):
+    url = f"/maturity/{FW}/STR1"
+    form = {"a:1.1": "met", "a:1.2": "met", "a:1.3": "not_met", "n:1.3": "No policy yet"}
+    r = client.post(url, data=form, follow_redirects=False)
+    assert r.status_code == 303 and "3%20answer" in r.headers["location"]
+    page = client.get(url).text
+    assert "Blocked by" in page and "1.3" in page and "No policy yet" in page
+    r = client.post(url, data=form, follow_redirects=False)            # same values again
+    assert "No%20changes" in r.headers["location"]
+    assert len(maturity.answer_history(FW, "STR1")) == 3
+    client.post(url, data={"n:1.3": "Policy draft under review"})        # note only
+    latest = maturity.latest_answers(FW)[("STR1", "1.3")]
+    assert latest["answer"] == "not_met" and latest["note"] == "Policy draft under review"
+
+
+def test_form_rejects_invalid_na_and_saves_nothing(client):
+    r = client.post(f"/maturity/{FW}/HRS6", data={"a:1.1": "met", "a:5.4": "na"}, follow_redirects=False)
+    assert "ok=0" in r.headers["location"] and "Nothing%20was%20saved" in r.headers["location"]
+    assert maturity.latest_answers(FW) == {}
+    r = client.post(f"/maturity/{FW}/HRS6", data={"a:5.4": "na", "n:5.4": "No cloud services"},
+                    follow_redirects=False)
+    assert "ok=1" in r.headers["location"]
+    assert "No cloud services" in client.get(f"/maturity/{FW}").text      # Cloud section
+
+
+def test_save_and_next_goes_to_following_measure(client):
+    r = client.post(f"/maturity/{FW}/STR1", data={"a:1.1": "met", "next": "1"}, follow_redirects=False)
+    assert r.headers["location"].startswith(f"/maturity/{FW}/GOV1?")
+
+
+def test_viewer_sees_read_only_form(client):
+    with LoggedInClient(app, role="viewer") as viewer:
+        page = viewer.get(f"/maturity/{FW}/STR1").text
+        assert "disabled" in page and "Save and go to" not in page
+        assert viewer.post(f"/maturity/{FW}/STR1", data={"a:1.1": "met"}).status_code == 403

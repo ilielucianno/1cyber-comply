@@ -1,0 +1,77 @@
+{% extends "base.html" %}
+{% block title %}{{ cat.name }} · {{ app_name }}{% endblock %}
+{% macro lv(level) -%}
+<span class="lv {{ 'hi' if level >= cat.target_level else ('mid' if level >= cat.target_level - 1 else 'lo') }}">{{ level }}</span>
+{%- endmacro %}
+{% block content %}
+{% if flash %}<div class="flash {{ 'ok' if flash_ok else 'err' }}">{{ flash }}</div>{% endif %}
+
+<h1 style="font-size:22px;margin:0 0 4px">{{ cat.name }}</h1>
+<p class="muted" style="margin:0 0 16px">{{ cat.authority }} · {{ cat.reference }} · target level {{ cat.target_level }} on every measure</p>
+
+<div class="card" style="margin-bottom:8px">
+  <div class="score">
+    <div>
+      <div class="sub">Measures at level {{ cat.target_level }} or higher</div>
+      <div class="big {{ 'ok' if s.mature else 'off' }}">{{ s.measures_at_target }}/{{ s.measures_total }}</div>
+    </div>
+    <div class="sub">
+      <div><strong class="{{ 'ok' if s.mature else 'off' }}">{{ 'Mature' if s.mature else 'Not mature yet' }}</strong>{% if not s.mature %}: {{ s.below_target }} measure(s) below level {{ cat.target_level }}{% endif %}</div>
+      <div>Average level {{ s.avg_level }} · lowest level {{ s.min_level }}</div>
+      <div>{{ s.requirements_answered }} of {{ s.requirements_total }} requirements assessed
+        {% if s.not_applicable_total %}· {{ s.not_applicable_total }} not applicable{% endif %}</div>
+    </div>
+  </div>
+  {% set colors = ['#f85149', '#db6d28', '#d29922', '#3fb950', '#2ea043', '#58a6ff'] %}
+  <div class="dist" title="Measures per level">
+    {% for level, count in s.distribution.items() %}{% if count %}
+    <span style="width:{{ 100 * count / s.measures_total }}%;background:{{ colors[level] }}" title="Level {{ level }}: {{ count }}"></span>
+    {% endif %}{% endfor %}
+  </div>
+  <div class="legend" style="margin-top:6px">
+    {% for level, count in s.distribution.items() %}<i style="background:{{ colors[level] }};height:8px;width:8px;border-radius:2px"></i>level {{ level }}: {{ count }}{% endfor %}
+  </div>
+</div>
+<p class="muted" style="font-size:13px">Levels are cumulative: a measure reaches a level only when every requirement of that level and of
+  all levels below it is met. The first unmet requirement blocks the measure. Unassessed requirements count as not met.</p>
+
+<p style="font-size:14px">Show:
+  <a href="?show=all" class="{{ 'muted' if show != 'all' }}">all measures</a> ·
+  <a href="?show=below" class="{{ 'muted' if show != 'below' }}">below level {{ cat.target_level }}</a> ·
+  <a href="?show=open" class="{{ 'muted' if show != 'open' }}">not fully assessed</a></p>
+
+{% for c in s.categories %}
+{% set rows = c.shown %}
+{% if rows %}
+<h2>{{ c.title }} <span style="text-transform:none;letter-spacing:0">· lowest {{ c.min_level }} · average {{ c.avg_level }}</span></h2>
+<div class="card">
+  {% for x in rows %}
+  <div class="row">
+    <span>{{ lv(x.level) }} <a href="/maturity/{{ cat.id }}/{{ x.id }}"><code style="color:inherit">{{ x.id }}</code> {{ x.title }}</a></span>
+    <span class="muted" style="font-size:13px;text-align:right">
+      {% if x.blocking %}blocked by {{ x.blocking.id }} ({{ 'not met' if x.blocking.reason == 'not_met' else 'not assessed' }}) · {% endif %}
+      {{ x.answered }}/{{ x.total }} assessed
+    </span>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endfor %}
+
+{% for sec in s.not_applicable_sections %}
+<h2>{{ sec.title }}: not applicable</h2>
+<div class="card">
+  <p class="muted" style="margin-top:0;font-size:13px">{{ sec.condition }}</p>
+  {% for i in sec['items'] %}
+  <div class="row">
+    <span><a href="/maturity/{{ cat.id }}/{{ i.measure_id }}"><code style="color:inherit">{{ i.measure_id }} {{ i.id }}</code></a> {{ i.note }}</span>
+    <span class="muted" style="font-size:13px">{{ i.answered_by }} · {{ i.answered_at }} UTC</span>
+  </div>
+  {% else %}
+  <div class="row muted">No requirement marked not applicable.</div>
+  {% endfor %}
+</div>
+{% endfor %}
+
+{% if cat.translation %}<p class="muted" style="font-size:12px;margin-top:24px">{{ cat.translation }}</p>{% endif %}
+{% endblock %}
