@@ -1,11 +1,12 @@
 # Changelog
 
-## Unreleased (v1.2.0)
+## v1.2.0 - 2026-11-09
 
 ### Added
 - Maturity model support, starting with the Cyprus DSA cybersecurity maturity model
   (K.D.P. 245/2024, Annex E): 70 measures in 17 categories, levels 0-5, unofficial
-  English translation in `controls/maturity/dsa-cy-245-2024.yaml`.
+  English translation in `controls/maturity/dsa-cy-245-2024.yaml`, read through by a
+  Cyprus cybersecurity practitioner with no changes requested.
 - Maturity scoring engine (`app/maturity.py`). Levels are cumulative: the first unmet
   requirement caps the measure and is reported as the blocking requirement. Unanswered
   requirements count as not met. "Not applicable" is accepted only on requirements the

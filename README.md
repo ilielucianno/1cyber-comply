@@ -30,6 +30,7 @@ teams already have: **Wazuh**, **OPNsense** and **Microsoft 365**.
 | **Manual evidence** | On any control: pass/fail assessment, note, file, reviewer and validity date. Expired evidence turns red automatically. Combines with automated sources |
 | **Compliance score** | Only proven controls count. History chart, collection every 24 h |
 | **PDF report** | Score, findings to fix, every control with its evidence, file hashes |
+| **Cyprus DSA maturity model** | K.D.P. 245/2024 Annex E: 70 measures, 1,499 requirements, levels 0-5, English translation. Assessment screens, blocking requirement per measure, 23 requirements backed by automated evidence, PDF report with a remediation plan to level 3 |
 | **Built for audits** | Roles (viewer / editor / admin), audit log of every action, evidence history per control |
 | **Read-only by design** | Never changes anything on your systems. Minimal privileges documented below |
 
@@ -157,6 +158,31 @@ more than has been proven. A snapshot is stored after every collection; collecti
 The report states clearly that it supports, but does not replace, an assessment by the
 competent authority or an accredited auditor. It is not a certification.
 
+## Maturity models (Cyprus DSA)
+
+Some national authorities assess NIS2 with a maturity model instead of pass/fail. 1cyber
+Comply ships the Cyprus Digital Security Authority (DSA) model from K.D.P. 245/2024 Annex E
+(`controls/maturity/dsa-cy-245-2024.yaml`); each authority's framework is its own catalogue.
+
+- **Scoring.** Levels are cumulative. A measure reaches a level only when every requirement
+  of that level and of all lower levels is met; the first unmet requirement is the blocking
+  requirement and caps the measure (1.3 not met means level 0, even if level 3 is met).
+  Unassessed requirements count as not met. The organisation is mature when every measure
+  is at level 3 or higher.
+- **Not applicable** is accepted only where the catalogue allows it: for the DSA model, the two
+  requirements that apply only when cloud services are used (DS1 4.9, HRS6 5.4). It needs a
+  justification and is reported in a Cloud section.
+- **Automated evidence** (`controls/maturity/evidence/`) links 23 requirements to Wazuh,
+  OPNsense and Microsoft 365 checks. Evidence suggests answers but never overwrites the
+  assessor; most links are "partial" and can only point out a gap. Saved answers that the
+  current evidence contradicts are flagged as conflicts.
+- **Report.** `/reports/maturity/dsa-cy-245-2024.pdf`: verdict, levels per category and
+  measure, blocking requirements, a prioritised remediation plan to level 3, the Cloud
+  section, evidence conflicts and the full assessment record.
+
+The English text is an unofficial translation, read through by a Cyprus cybersecurity
+practitioner; the Greek text in the Official Gazette prevails.
+
 ## Users and security
 
 | Role | Can |
@@ -199,9 +225,12 @@ app/
   scoring.py         compliance score, history, chart
   manual.py          manual evidence and file uploads
   report.py          PDF report (ReportLab)
+  maturity.py        maturity models: catalogue, scoring, answers, automated evidence
+  maturity_report.py maturity PDF report with remediation plan
   scheduler.py       automatic collection
 controls/nis2.yaml   control catalogue - add a framework by adding a YAML file
-tests/               89 tests, Wazuh, OPNsense and Microsoft Graph simulated, no network needed
+controls/maturity/   maturity models (Cyprus DSA) and their automated evidence links
+tests/               140 tests, Wazuh, OPNsense and Microsoft Graph simulated, no network needed
 ```
 
 Stack: Python 3.12, FastAPI, SQLite, Jinja2, ReportLab, Docker. All dependencies use
